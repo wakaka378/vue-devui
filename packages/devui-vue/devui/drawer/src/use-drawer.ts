@@ -1,13 +1,17 @@
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { onClickOutside } from '@vueuse/core';
 import { DrawerEmit, DrawerProps, UseDrawerFn } from './drawer-types';
-import { lockScroll } from '../../shared/util/lock-scroll';
+import { lockScroll } from '../../shared/utils/lock-scroll';
+import { useNamespace } from '../../shared/hooks/use-namespace';
 
 export function useDrawer(props: DrawerProps, emit: DrawerEmit): UseDrawerFn {
+  const ns = useNamespace('drawer');
+  const modalNs = useNamespace('modal', true);
   const drawerRef = ref<HTMLElement>();
+  const overlayRef = ref<HTMLElement>();
   const drawerClasses = computed(() => ({
-    'devui-drawer': true,
-    [`devui-drawer-${props.position}`]: true,
+    [ns.b()]: true,
+    [ns.m(props.position)]: true,
   }));
   const close = () => {
     emit('update:modelValue', false);
@@ -23,8 +27,21 @@ export function useDrawer(props: DrawerProps, emit: DrawerEmit): UseDrawerFn {
   const handleEscClose = (e: KeyboardEvent) => {
     e.code === 'Escape' && execClose();
   };
+  const handleClickOutside = (e: PointerEvent) => {
+    const composedPath = e.composedPath();
+    const modalOverlay = document.querySelectorAll(modalNs.e('overlay'));
+    const modal = document.querySelectorAll(modalNs.b());
+    const isClickModalOverlay = Array.from(modalOverlay).filter((item) => composedPath.includes(item));
+    const isClickModal = Array.from(modal).filter((item) => composedPath.includes(item));
+    if (isClickModalOverlay.length || isClickModal.length) {
+      return;
+    }
+    execClose();
+  };
 
-  onClickOutside(drawerRef, execClose);
+  setTimeout(() => {
+    onClickOutside(drawerRef, handleClickOutside, { capture: false, ignore: [overlayRef] });
+  });
 
   const removeBodyAdditions = () => {
     lockScrollCb?.();
@@ -46,5 +63,5 @@ export function useDrawer(props: DrawerProps, emit: DrawerEmit): UseDrawerFn {
 
   onUnmounted(removeBodyAdditions);
 
-  return { drawerRef, drawerClasses, handleOverlayClick };
+  return { overlayRef, drawerRef, drawerClasses, handleOverlayClick };
 }

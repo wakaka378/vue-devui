@@ -1,37 +1,38 @@
-@import '../../style/theme/color';
+@import '../../styles-var/devui-var.scss';
 
-$devui-transfer-border-color: #adb0b8;
-$devui-transfer-border-radius: 2px;
 $devui-transfer-header-height: 40px;
-$devui-transfer-header-border-line-color:#dfe1e6;
 $devui-transfer-body-list-item-height: 32px;
 
-.devui-transfer {
+.#{$devui-prefix}-transfer {
   display: flex;
 
-  &-panel {
+  &__panel {
     width: 300px;
-    border: 1px solid $devui-transfer-border-color;
-    border-radius: $devui-transfer-border-radius;
+    border: 1px solid $devui-line;
+    border-radius: $devui-border-radius;
 
-    &-header {
+    &--header {
       display: flex;
       justify-content: space-between;
       height: $devui-transfer-header-height;
       line-height: $devui-transfer-header-height;
-      border-bottom: 1px solid$devui-transfer-header-border-line-color;
+      border-bottom: 1px solid $devui-dividing-line;
+      padding: 0 16px;
 
       &-allChecked {
         display: flex;
-        margin-left: 20px;
       }
 
       &-num {
-        margin-right: 12px;
+        color: $devui-aide-text;
+
+        &-unit {
+          margin-left: 4px;
+        }
       }
     }
 
-    &-body {
+    &--body {
       display: flex;
       flex-direction: column;
       height: 100%;
@@ -41,49 +42,68 @@ $devui-transfer-body-list-item-height: 32px;
         justify-content: center;
         align-items: center;
         width: 100%;
-        padding: 7px 20px;
+        padding: 7px 16px 0 16px;
 
-        .devui-search,
-        .devui-input__wrap {
+        .#{$devui-prefix}-search {
           width: 100%;
+        }
+
+        .#{$devui-prefix}-input__inner {
+          padding: 5px 0;
         }
       }
 
       &-list {
         overflow: auto;
+        padding-top: 8px;
         width: 100%;
 
+        &-group > div > div {
+          padding: 0 16px;
+          cursor: pointer;
+        }
+
         &-item {
-          height: $devui-transfer-body-list-item-height;
-          line-height: $devui-transfer-body-list-item-height;
           display: flex;
           align-items: center;
           border-top: 2px solid transparent;
           border-bottom: 2px solid transparent;
+          padding: 4px 0;
+          cursor: pointer;
+          height: 36px;
+          line-height: 36px;
+          font-size: $devui-font-size;
 
-          label {
-            text-overflow: ellipsis;
-            overflow: hidden;
-            white-space: nowrap;
-            height: auto;
+          .icon-drag-small {
+            cursor: move;
+            padding: 0 1px;
+            visibility: hidden;
+          }
+
+          &:hover .icon-drag-small {
+            visibility: visible;
           }
         }
 
         &-drag {
-          width: 100%;
-          display: flex;
-          align-items: center;
+          &-dragging {
+            background-color: $devui-brand-foil !important;
+          }
 
-          &__icon {
-            padding: 0 4px;
-            visibility: hidden;
-            height: 28px;
-            display: flex;
-            align-items: center;
+          &-over {
+            background-color: $devui-brand-hover;
+          }
+
+          &-over-top {
+            border-top-color: $devui-brand-active;
+          }
+
+          &-over-bottom {
+            border-bottom-color: $devui-brand-active;
           }
         }
 
-        &-drag:hover .devui-transfer-panel-body-list-drag__icon {
+        &-drag:hover .#{$devui-prefix}-transfer__panel-body-list-drag__icon {
           visibility: visible;
         }
 
@@ -106,29 +126,26 @@ $devui-transfer-body-list-item-height: 32px;
         padding: 0 20px;
       }
     }
+  }
 
-    &-operation {
-      width: 10%;
+  &__operate {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0 12px;
+
+    &--group {
       display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
+      flex-direction: column;
 
-      &-group {
+      .#{$devui-prefix}-button__icon.#{$devui-prefix}-button--circle.#{$devui-prefix}-button--lg {
         width: 36px;
+        height: 36px;
+      }
 
-        &-left .devui-btn,
-        &-right .devui-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          padding: 0;
-          min-width: 36px !important;
-        }
-
-        &-right {
-          margin-top: 12px;
-        }
+      &-right {
+        margin-top: 20px;
       }
     }
   }
@@ -140,12 +157,26 @@ $devui-transfer-body-list-item-height: 32px;
   &-drag-over {
     background-color: $devui-brand-hover;
   }
-}
 
-.devui-transfer–drag-over-top {
+  .transfer-checkbox {
+    height: 36px;
+    line-height: 36px;
+    font-size: $devui-font-size;
+  }
+}
+.#{$devui-prefix}-transfer–drag-over-top {
   border-top-color: $devui-brand-active;
 }
 
-.devui-transfer–drag-over-bottom {
+.#{$devui-prefix}-transfer–drag-over-bottom {
   border-bottom-color: $devui-brand-active;
+}
+
+.transfer-checkbox .#{$devui-prefix}-checkbox label {
+  display: flex;
+  width: 100% !important;
+}
+
+.transfer-checkbox .#{$devui-prefix}-checkbox label .#{$devui-prefix}-checkbox__material {
+  flex-shrink: 0;
 }

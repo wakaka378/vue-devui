@@ -1,12 +1,8 @@
-@import '../../style/mixins/index';
-@import '../../style/theme/color';
-@import '../../style/theme/shadow';
-@import '../../style/theme/corner';
-@import '../../style/theme/font';
+@import '../../styles-var/devui-var.scss';
 
-.devui-slider {
+.#{$devui-prefix}-slider {
   position: relative;
-  width: 90%;
+  width: 100%;
   display: block;
 
   &.disabled {
@@ -25,17 +21,23 @@
     height: 5px;
     display: flex;
     align-items: center;
-    background-color: $devui-default-bg;
+    border-radius: $devui-border-radius-full;
+    background-color: $devui-area;
 
     &.disabled {
+      background-color: $devui-disabled-bg;
       cursor: not-allowed;
     }
 
-    .devui-slider__bar {
+    &:hover .#{$devui-prefix}-slider__bar:not(.disabled) {
+      background-color: $devui-brand-hover;
+    }
+
+    .#{$devui-prefix}-slider__bar {
       height: 6px;
-      background-color: $devui-default-line;
-      border-top-left-radius: $devui-border-radius;
-      border-bottom-left-radius: $devui-border-radius;
+      background-color: $devui-brand;
+      border-top-left-radius: $devui-border-radius-full;
+      border-bottom-left-radius: $devui-border-radius-full;
       position: absolute;
 
       &.disabled {
@@ -48,32 +50,31 @@
       }
     }
 
-    .devui-slider__button {
+    .#{$devui-prefix}-slider__button {
       position: absolute;
       width: 14px;
       height: 14px;
-      border: 2px solid $devui-default-line;
+      border: 2px solid $devui-brand;
       background-color: $devui-base-bg;
       border-radius: 50%;
       margin-left: -7px;
       transition: transform 0.2s ease-in-out;
 
-      &:hover {
-        transform: scale(1.2);
+      &:hover:not(.disabled) {
+        border-color: $devui-brand-hover;
+        transform: scale(1.3);
       }
 
       &.disabled {
-        background-color: $devui-base-bg;
         border-color: $devui-disabled-line;
       }
 
-      &.disabled:hover {
+      &.disabled {
         cursor: not-allowed;
-        transform: none;
       }
     }
 
-    .devui-slider_popover {
+    .#{$devui-prefix}-slider__popover {
       position: relative;
       bottom: 26px;
       transform: translate(-50%);
@@ -81,7 +82,7 @@
       font-size: $devui-font-size-sm;
       color: $devui-feedback-overlay-text;
 
-      .devui-slider_popover-arrow {
+      .#{$devui-prefix}-slider__popover-arrow {
         position: absolute;
         left: 50%;
         margin-left: -4px;
@@ -94,43 +95,12 @@
         background-color: $devui-feedback-overlay-bg;
       }
 
-      .devui-slider_popover-content {
+      .#{$devui-prefix}-slider__popover-content {
         padding: 5px 14px;
         text-align: center;
         border-radius: $devui-border-radius-feedback;
         background-color: $devui-feedback-overlay-bg;
       }
-    }
-  }
-
-  .devui-min_count {
-    position: absolute;
-    top: 15px;
-    left: 0;
-    font-size: $devui-font-size;
-    color: $devui-text;
-  }
-
-  .devui-max_count {
-    position: absolute;
-    top: 15px;
-    right: 0;
-    font-size: $devui-font-size;
-    color: $devui-text;
-  }
-
-  .devui-input__out-wrap {
-    font-size: $devui-font-size;
-    position: absolute;
-    right: -60px;
-    top: -12px;
-    padding: 5px 10px;
-    cursor: text;
-    margin-left: 20px;
-
-    input {
-      width: 40px;
-      text-align: center;
     }
   }
 }

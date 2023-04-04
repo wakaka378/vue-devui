@@ -1,68 +1,53 @@
-
-import { defineComponent, provide } from 'vue';
-import mitt from 'mitt';
-import { formProps, FormProps, IFormItem, dFormEvents, formInjectionKey, IForm } from './form-types';
-import { EventBus } from './util';
-import './form.scss';
-
+import { defineComponent, provide, reactive, SetupContext, toRefs, watch } from 'vue';
+import { formProps, FormProps, FORM_TOKEN } from './form-types';
+import { useNamespace } from '../../shared/hooks/use-namespace';
+import useFieldCollection from './composables/use-field-collection';
+import useFormValidation from './composables/use-form-validation';
 
 export default defineComponent({
   name: 'DForm',
   props: formProps,
-  emits: ['submit'],
-  setup(props: FormProps, ctx) {
-    const formMitt = mitt();
-    const fields: IFormItem[] =  [];
-    const resetFormFields = () => {
-      fields.forEach((field: IFormItem) => {
-        field.resetField();
-      });
-    };
+  emits: ['validate'],
+  setup(props: FormProps, ctx: SetupContext) {
+    const ns = useNamespace('form');
+    const { itemContexts, addItemContext, removeItemContext } = useFieldCollection();
+    const { validate, validateFields, resetFields, clearValidate } = useFormValidation(itemContexts);
 
-    formMitt.on(dFormEvents.addField, (field: any) => {
-      if(field) {
-        fields.push(field);
-      }
-    });
-
-    formMitt.on(dFormEvents.removeField, (field: any) => {
-      if(field.prop) {
-        fields.splice(fields.indexOf(field), 1);
-      }
-    });
-
-    provide(formInjectionKey, {
-      formData: props.formData,
-      formMitt,
-      labelData: {
-        layout: props.layout,
-        labelSize: props.labelSize,
-        labelAlign: props.labelAlign,
-      },
-      rules: props.rules,
-      columnsClass: props.columnsClass,
-      messageShowType: 'popover'
-    });
-
-    const onSubmit = (e) => {
+    const onSubmit = (e: Event) => {
       e.preventDefault();
-      ctx.emit('submit', e);
-      EventBus.emit(`formSubmit:${props.name}`);
     };
 
-    return {
-      fields,
-      formMitt,
-      onSubmit,
-      resetFormFields
-    };
-  },
-  render() {
-    const {onSubmit} = this;
-    return (
-      <form onSubmit={onSubmit} class="devui-form">
-        {this.$slots.default?.()}
+    watch(
+      () => props.rules,
+      () => {
+        if (props.validateOnRuleChange) {
+          validate();
+        }
+      },
+      { deep: true }
+    );
+
+    provide(
+      FORM_TOKEN,
+      reactive({
+        ...toRefs(props),
+        emit: ctx.emit,
+        addItemContext,
+        removeItemContext,
+      })
+    );
+
+    ctx.expose({
+      validate,
+      validateFields,
+      resetFields,
+      clearValidate,
+    });
+
+    return () => (
+      <form onSubmit={onSubmit} class={ns.b()}>
+        {ctx.slots.default?.()}
       </form>
     );
-  }
+  },
 });

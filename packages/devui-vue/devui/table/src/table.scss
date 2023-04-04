@@ -1,9 +1,22 @@
 @import '../../styles-var/devui-var.scss';
 
-.devui-table {
+.#{$devui-prefix}-table {
+  position: relative;
+  display: flex;
   width: 100%;
   overflow-x: auto;
-  padding-top: 8px;
+
+  .hidden-columns {
+    position: absolute;
+    visibility: hidden;
+    z-index: -1;
+  }
+
+  // fix v-dLoading can't completely covered
+  &__container {
+    flex: 1;
+    overflow: auto;
+  }
 
   &__view {
     display: table;
@@ -23,9 +36,8 @@
   }
 
   &__empty {
-    width: 100%;
-    font-size: $devui-font-size;
-    text-align: center;
+    padding: 40px 0;
+    background-color: $devui-base-bg;
   }
 
   &__fix-header {
@@ -33,11 +45,17 @@
     flex-direction: column;
     position: relative;
     height: 100%;
+    overflow: auto;
+  }
+
+  &__fix-header > &__header-wrapper {
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 
   &__scroll-view {
     flex: 1;
-    overflow: scroll;
   }
 
   &--layout-auto {
@@ -46,34 +64,37 @@
 
   &--sm {
     tbody > tr > td {
+      font-size: $devui-font-size-sm;
       padding: 7px 20px 8px;
 
-      &.devui-table__checkable-cell {
+      &.#{$devui-prefix}-table__checkable-cell {
         padding: 8px;
       }
     }
 
-    thead > tr > th.devui-table__checkable-cell {
+    thead > tr > th.#{$devui-prefix}-table__checkable-cell {
       padding: 8px;
     }
   }
 
   &--md {
     tbody > tr > td {
+      font-size: $devui-font-size-md;
       padding: 11px 20px 12px;
     }
 
-    thead > tr > th.devui-table__checkable-cell {
+    thead > tr > th.#{$devui-prefix}-table__checkable-cell {
       padding: 8px 20px;
     }
   }
 
   &--lg {
     tbody > tr > td {
+      font-size: $devui-font-size-lg;
       padding: 15px 20px 16px;
     }
 
-    thead > tr > th.devui-table__checkable-cell {
+    thead > tr > th.#{$devui-prefix}-table__checkable-cell {
       padding: 8px 20px;
     }
   }
@@ -106,4 +127,20 @@
       }
     }
   }
+
+  .resize-bar {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: $devui-form-control-line-active;
+    z-index: $devui-z-index-function-widget;
+    cursor: col-resize;
+  }
+}
+
+.table-selector {
+  user-select: none;
+  cursor: col-resize;
 }

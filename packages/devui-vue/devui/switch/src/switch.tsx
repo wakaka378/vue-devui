@@ -1,98 +1,46 @@
-import { defineComponent, PropType, renderSlot, useSlots } from 'vue';
+import { defineComponent, renderSlot, useSlots, SetupContext } from 'vue';
+import { SwitchProps, switchProps } from './switch-types';
+import { useNamespace } from '../../shared/hooks/use-namespace';
+import { useSwitch } from './use-switch';
 import './switch.scss';
-
-const switchProps = {
-  size: {
-    type: String as PropType<'small' | 'middle' | 'large'>,
-    default: 'middle'
-  },
-  color: {
-    type: String,
-    default: undefined
-  },
-  checked: {
-    type: Boolean,
-    default: false
-  },
-  disabled: {
-    type: Boolean,
-    default: false
-  },
-  beforeChange: {
-    type: Function as PropType<(v: boolean) => boolean | Promise<boolean>>,
-    default: undefined
-  },
-  change: {
-    type: Function as PropType<(v: boolean) => void>,
-    default: undefined
-  },
-  'onUpdate:checked': {
-    type: Function as PropType<(v: boolean) => void>,
-    default: undefined
-  }
-} as const;
 
 export default defineComponent({
   name: 'DSwitch',
   props: switchProps,
-  emits: ['change', 'update:checked'],
-  setup(props, ctx) {
-    const canChange = () => {
-      if (props.disabled) {
-        return Promise.resolve(false);
-      }
-      if (props.beforeChange) {
-        const res = props.beforeChange(!props.checked);
-        return typeof res === 'boolean' ? Promise.resolve(res) : res;
-      }
+  emits: ['change', 'update:modelValue'],
+  setup(props: SwitchProps, ctx: SetupContext) {
+    const ns = useNamespace('switch');
+    const { toggle, checked, switchDisabled, switchSize } = useSwitch(props, ctx);
+    return () => {
+      const switchCls = {
+        [ns.b()]: true,
+        [ns.m(switchSize.value)]: true,
+      };
 
-      return Promise.resolve(true);
-    };
-    const toggle = () => {
-      canChange().then(res => {
-        if (!res) {
-          return;
-        }
-        ctx.emit('update:checked', !props.checked);
-        ctx.emit('change', !props.checked);
-      });
-    };
+      const switchWrapperCls = {
+        [ns.e('wrapper')]: true,
+        [ns.m('checked')]: checked.value,
+        [ns.m('disabled')]: switchDisabled.value,
+      };
 
-    return {
-      toggle
+      const switchWrapperStyle = [
+        `background: ${checked.value && !switchDisabled.value ? props.color : ''}`,
+        `border-color: ${checked.value && !switchDisabled.value ? props.color : ''}`,
+      ];
+
+      const checkedContent = renderSlot(useSlots(), 'checkedContent');
+      const uncheckedContent = renderSlot(useSlots(), 'uncheckedContent');
+
+      return (
+        <div class={switchCls}>
+          <span class={switchWrapperCls} style={switchWrapperStyle} onClick={toggle}>
+            <span class={ns.e('inner-wrapper')}>
+              <div class={ns.e('inner')}>{checked.value ? checkedContent : uncheckedContent}</div>
+            </span>
+            <small></small>
+          </span>
+        </div>
+      );
     };
   },
-
-  render() {
-    const {
-      size,
-      checked,
-      disabled,
-      color,
-      toggle
-    } = this;
-    const outerCls = {
-      'devui-switch': true,
-      [`devui-switch-${size}`]: size !== '',
-      'devui-checked': checked,
-      'devui-disabled': disabled
-    };
-    const outerStyle = [
-      `background: ${checked && !disabled ? color : ''}`,
-      `border-color: ${checked && !disabled ? color : ''}`
-    ];
-
-    const checkedContent = renderSlot(useSlots(), 'checkedContent');
-    const uncheckedContent = renderSlot(useSlots(), 'uncheckedContent');
-    return (
-      <span class={outerCls} style={outerStyle} onClick={toggle}>
-        <span class="devui-switch-inner-wrapper">
-          <div class="devui-switch-inner">
-            {checked ? checkedContent : uncheckedContent}
-          </div>
-        </span>
-        <small></small>
-      </span>
-    );
-  }
 });

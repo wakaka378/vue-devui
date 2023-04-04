@@ -1,36 +1,52 @@
-import { ref, Ref, watch } from 'vue';
-import { TreeData, TreeItem } from '../tree-types';
+import { Ref, SetupContext } from 'vue';
+import { IInnerTreeNode, IUseCore, IUseToggle, IUseLazyLoad } from './use-tree-types';
 
-interface IUseToggle {
-  openedData: Ref<TreeData>;
-  toggle: (target: Event, item: TreeItem) => void;
-}
+export function useToggle() {
+  return function useToggleFn(data: Ref<IInnerTreeNode[]>, core: IUseCore, context: SetupContext, lazyLode: IUseLazyLoad): IUseToggle {
+    const { getNode, setNodeValue } = core;
+    const { lazyLoadNodes } = lazyLode;
 
-export default function useToggle(data: Ref<TreeData>): IUseToggle {
-  const openedTree = (tree: TreeData): TreeData => {
-    return tree.reduce((acc: TreeData, item: TreeItem) => (
-      item.open
-        ? acc.concat(item, item.children ? openedTree(item.children) : [])
-        : acc.concat(item)
-    ), []);
-  };
+    const expandNode = (node: IInnerTreeNode): void => {
+      if (node.disableToggle || node.loading) {
+        return;
+      }
 
-  const openedData = ref(openedTree(data.value));
+      setNodeValue(node, 'expanded', true);
+      context.emit('toggle-change', node);
+    };
 
-  watch(
-    () => data.value,
-    (d) => openedData.value = openedTree(d),
-    { deep: true }
-  );
-  const toggle = (target: Event, item: TreeItem) => {
-    target.stopPropagation();
-    if (!item.children) {return;}
-    item.open = !item.open;
-    openedData.value = openedTree(data.value);
-  };
+    const collapseNode = (node: IInnerTreeNode): void => {
+      if (node.disableToggle || node.loading) {
+        return;
+      }
+      setNodeValue(node, 'expanded', false);
+      context.emit('toggle-change', node);
+    };
 
-  return {
-    openedData,
-    toggle,
+    const toggleNode = (node: IInnerTreeNode): void => {
+      if (node.disableToggle || node.loading) {
+        return;
+      }
+      if (getNode(node).expanded) {
+        collapseNode(node);
+      } else {
+        expandNode(node);
+      }
+      // 懒加载节点
+      lazyLoadNodes(node);
+    };
+
+    const expandAllNodes = (): void => {
+      data.value.forEach((node: IInnerTreeNode) => {
+        expandNode(node);
+      });
+    };
+
+    return {
+      expandNode,
+      collapseNode,
+      toggleNode,
+      expandAllNodes,
+    };
   };
 }

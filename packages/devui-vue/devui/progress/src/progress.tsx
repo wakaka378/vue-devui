@@ -1,48 +1,32 @@
-import { defineComponent, reactive, toRefs, watch } from 'vue';
+import { CSSProperties, defineComponent, effect, reactive, ref, toRefs, watch } from 'vue';
+import { middleNum } from '../../shared/utils';
+import { ProgressProps, progressProps, ISvgData } from './progress-types';
+import { useNamespace } from '../../shared/hooks/use-namespace';
 import './progress.scss';
-
-interface data {
-  pathString: string;
-  trailPath: any;
-  strokePath: any;
-}
 
 export default defineComponent({
   name: 'DProgress',
-  props: {
-    height: {
-      type: String,
-      default: '20px',
-    },
-    percentage: {
-      type: Number,
-      default: 0,
-    },
-    percentageText: {
-      type: String,
-      default: '',
-    },
-    barBgColor: {
-      type: String,
-      default: '#5170ff',
-    },
-    isCircle: {
-      type: Boolean,
-      default: false,
-    },
-    strokeWidth: {
-      type: Number,
-      default: 6,
-    },
-    showContent: {
-      type: Boolean,
-      default: true,
-    },
-  },
-  setup(props) {
-    const { height, percentage, percentageText, barBgColor, isCircle, strokeWidth, showContent } = toRefs(props);
+  props: progressProps,
+  setup(props: ProgressProps) {
+    const {
+      height,
+      percentage,
+      percentageText,
+      percentageTextPlacement,
+      percentageTextColor,
+      barBgColor,
+      isCircle,
+      strokeWidth,
+      showContent,
+    } = toRefs(props);
 
-    const data: data = reactive({
+    const normalPercentage = ref(0);
+
+    effect(() => {
+      normalPercentage.value = middleNum(percentage.value);
+    });
+
+    const data: ISvgData = reactive({
       pathString: '',
       trailPath: null,
       strokePath: null,
@@ -72,7 +56,7 @@ export default defineComponent({
 
       data.strokePath = {
         stroke: barBgColor || null,
-        strokeDasharray: `${(percentage.value / 100) * len}px ${len}px`,
+        strokeDasharray: `${(normalPercentage.value / 100) * len}px ${len}px`,
         strokeDashoffset: `0`,
         transition: 'stroke-dashoffset .3s ease 0s, stroke-dasharray .3s ease 0s, stroke .3s, stroke-width .06s ease .3s',
       };
@@ -80,62 +64,100 @@ export default defineComponent({
 
     setCircleProgress();
 
-    watch([height, percentage, percentageText, barBgColor, isCircle, strokeWidth, showContent], () => {
-      setCircleProgress();
-    });
+    watch(
+      [
+        height,
+        normalPercentage,
+        percentageText,
+        percentageTextPlacement,
+        percentageTextColor,
+        barBgColor,
+        isCircle,
+        strokeWidth,
+        showContent,
+      ],
+      () => {
+        setCircleProgress();
+      }
+    );
 
     return {
       data,
+      normalPercentage,
     };
   },
   render() {
-    const { height, percentage, percentageText, barBgColor, isCircle, strokeWidth, showContent, data, $slots } = this;
+    const {
+      height,
+      normalPercentage,
+      percentageText,
+      percentageTextPlacement,
+      percentageTextColor,
+      barBgColor,
+      isCircle,
+      strokeWidth,
+      showContent,
+      data,
+      $slots,
+    } = this;
+    const ns = useNamespace('progress');
 
-    const progressLine = (
-      <div
-        class="devui-progress--line"
-        style={{
-          height: height,
-          borderRadius: height,
-        }}>
-        <div
-          class="devui-progress-bar"
-          style={{
-            height: height,
-            borderRadius: height,
-            width: `${percentage}%`,
-            backgroundColor: barBgColor,
-          }}
-        />
+    const isOutside = percentageTextPlacement === 'outside';
+    const isInsideBg = percentageTextPlacement === 'insideBg';
+
+    const createPercentageText = () => {
+      return (
         <span
           style={{
             lineHeight: height,
+            color: percentageTextColor,
           }}>
           {percentageText}
         </span>
+      );
+    };
+
+    const progressLine = (
+      <div class={ns.e('content')}>
+        <div
+          class={ns.e('line')}
+          style={{
+            height: height,
+            borderRadius: height,
+          }}>
+          <div
+            class={[ns.e('bar'), percentageTextPlacement]}
+            style={{
+              height: height,
+              borderRadius: height,
+              width: `${normalPercentage}%`,
+              backgroundColor: barBgColor,
+            }}>
+            {!isOutside && !isInsideBg ? createPercentageText() : null}
+          </div>
+          {isInsideBg ? createPercentageText() : null}
+        </div>
+        {isOutside && !!percentageText ? createPercentageText() : null}
       </div>
     );
 
-    const textElement = <span class="devui-progress-circle-text">{percentage}%</span>;
+    const textElement = (
+      <span class={ns.e('circle-text')} style={{ color: percentageTextColor }}>
+        {normalPercentage}%
+      </span>
+    );
 
     const progressCircle = (
-      <div class="devui-progress-circle">
-        <svg class="devui-progress-circle" viewBox="0 0 100 100">
+      <div class={ns.e('circle')}>
+        <svg class={ns.e('circle')} viewBox="0 0 100 100">
+          <path fill-opacity="0" stroke-width={strokeWidth} style={data.trailPath as CSSProperties} d={data.pathString} />
           <path
-            class="devui-progress-circle-trail"
-            fill-opacity="0"
-            stroke-width={strokeWidth}
-            style={data.trailPath}
-            d={data.pathString}
-          />
-          <path
-            class="devui-progress-circle-path"
             d={data.pathString}
             stroke-linecap="round"
             fill-opacity="0"
             stroke={barBgColor}
-            stroke-width={percentage ? strokeWidth : 0}
-            style={data.strokePath}
+            stroke-width={normalPercentage ? strokeWidth : 0}
+            style={data.strokePath as CSSProperties}
           />
         </svg>
         {showContent && $slots.default?.()}
@@ -143,6 +165,6 @@ export default defineComponent({
       </div>
     );
 
-    return <div class="devui-progress">{!isCircle ? progressLine : progressCircle}</div>;
+    return <div class={ns.b()}>{!isCircle ? progressLine : progressCircle}</div>;
   },
 });

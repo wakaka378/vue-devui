@@ -45,6 +45,43 @@ export default defineComponent({
 
 :::
 
+### 保留最后一次关闭位置
+
+:::demo `keep-last`可使当前 modal 再次打开时保留上次关闭位置。
+
+```vue
+<template>
+  <d-button @click="handleClick">打开 modal</d-button>
+  <d-modal v-model="visible" title="Start Keep Last" :keep-last="true">
+    <div>name: {{ data.name }}</div>
+    <div>age: {{ data.age }}</div>
+    <div>address: {{ data.address }}</div>
+  </d-modal>
+</template>
+
+<script>
+import { defineComponent, ref, reactive } from 'vue';
+
+export default defineComponent({
+  setup() {
+    const visible = ref(false);
+    const data = reactive({
+      name: 'Tom',
+      age: 20,
+      address: 'Chengdu',
+    });
+    const handleClick = () => {
+      visible.value = true;
+    };
+
+    return { visible, data, handleClick };
+  },
+});
+</script>
+```
+
+:::
+
 ### 自定义标题和操作按钮
 
 :::demo `header`插槽可以自定义 Modal 顶部区域，子组件`d-modal-header`为顶部区域提供了默认样式，自定义样式可通过在子组件设置`style/class`实现。`footer`插槽同理。
@@ -88,6 +125,48 @@ export default defineComponent({
     };
 
     return { visible, data, handleClick, hidden };
+  },
+});
+</script>
+```
+
+:::
+
+### 信息提示
+
+:::demo 各种类型的信息提示框。
+
+```vue
+<template>
+  <d-button class="mr-1" @click="handleClick('success')">success</d-button>
+  <d-button class="mr-1" @click="handleClick('failed')">failed</d-button>
+  <d-button class="mr-1" @click="handleClick('warning')">warning</d-button>
+  <d-button class="mr-1" @click="handleClick('info')">info</d-button>
+  <d-modal v-model="visible" title="Start Snapshot Version" :type="type">
+    <div>name: {{ data.name }}</div>
+    <div>age: {{ data.age }}</div>
+    <div>address: {{ data.address }}</div>
+  </d-modal>
+</template>
+
+<script>
+import { defineComponent, ref, reactive } from 'vue';
+
+export default defineComponent({
+  setup() {
+    const visible = ref(false);
+    const type = ref('');
+    const data = reactive({
+      name: 'Tom',
+      age: 20,
+      address: 'Chengdu',
+    });
+    const handleClick = (t: string) => {
+      visible.value = true;
+      type.value = t;
+    };
+
+    return { visible, data, handleClick, type };
   },
 });
 </script>
@@ -146,28 +225,43 @@ export default defineComponent({
 
 :::
 
-### 服务方式调用
+### 弹窗中的按钮配置 autofocus 自动获取焦点
 
-:::demo 通过`inject('MODAL_SERVICE_TOKEN')`获取`ModalService`实例，调用实例上的`open`方法打开 Modal。
+::: demo `button` 配置 `autofocus` 可以自动获取焦点，可以通过回车 `enter` 触发按钮按钮点击
 
 ```vue
 <template>
-  <d-button @click="open">打开 modal</d-button>
+  <d-button @click="handleClick">打开 modal</d-button>
+  <d-modal v-model="visible" title="Start Snapshot Version">
+    <div>name: {{ data.name }}</div>
+    <div>age: {{ data.age }}</div>
+    <div>address: {{ data.address }}</div>
+    <template #footer>
+      <d-modal-footer style="text-align: right; padding-right: 20px;">
+        <d-button @click="hidden" autofocus>取消</d-button>
+        <d-button @click="hidden">确认</d-button>
+      </d-modal-footer>
+    </template>
+  </d-modal>
 </template>
-<script>
-import { ref, defineComponent, inject, onMounted, h } from 'vue';
 
+<script>
+import { defineComponent, ref, reactive } from 'vue';
 export default defineComponent({
   setup() {
-    const modalService = inject('MODAL_SERVICE_TOKEN');
-    const open = () => {
-      const result = modalService.open({
-        title: 'Start Snapshot Version',
-        content: () => h('div', {}, [h('div', {}, ['name: Tom']), h('div', {}, ['age: 10']), h('div', {}, ['address: Chengdu'])]),
-      });
+    const visible = ref(false);
+    const data = reactive({
+      name: 'Tom',
+      age: 20,
+      address: 'Chengdu',
+    });
+    const handleClick = () => {
+      visible.value = true;
     };
-
-    return { open };
+    const hidden = () => {
+      visible.value = false;
+    };
+    return { visible, data, handleClick, hidden };
   },
 });
 </script>
@@ -175,20 +269,28 @@ export default defineComponent({
 
 :::
 
-### d-modal 参数
+### Modal 参数
 
-| 属性                   | 类型             | 默认  | 说明                                       |
-| ---------------------- | ---------------- | ----- | ------------------------------------------ |
-| v-model                | `boolean`        | false | 是否显示 Modal                             |
-| title                  | `string`         | -     | 可选，Modal 的标题                         |
-| lock-scroll            | `boolean`        | true  | 可选，是否将 body 滚动锁定                 |
-| close-on-click-overlay | `boolean`        | true  | 可选，点击遮罩层是否能关闭 Modal           |
-| before-close           | `(done) => void` | -     | 可选，关闭前的回调，调用 done 可关闭 Modal |
+| 参数名                 | 类型                                 | 默认值 | 说明                                       | 跳转 Demo                                     |
+| :--------------------- | :----------------------------------- | :----- | :----------------------------------------- | :-------------------------------------------- |
+| v-model                | `boolean`                            | false  | 是否显示 Modal                             | [基础用法](#基础用法)                         |
+| title                  | `string`                             | -      | 可选，Modal 的标题                         | [基础用法](#基础用法)                         |
+| keep-last              | `boolean`                            | false  | 可选，是否保留上次移动位置                 | [保留最后一次关闭位置](#保留最后一次关闭位置) |
+| lock-scroll            | `boolean`                            | true   | 可选，是否将 body 滚动锁定                 |
+| close-on-click-overlay | `boolean`                            | true   | 可选，点击空白处是否能关闭 Modal           |
+| before-close           | `(done) => void`                     | -      | 可选，关闭前的回调，调用 done 可关闭 Modal | [关闭前回调](#关闭前回调)                     |
+| escapable              | `boolean`                            | true   | 可选，是否支持 esc 键关闭弹窗              |                                               |
+| show-close             | `boolean`                            | true   | 可选，是否展示关闭按钮                     |                                               |
+| draggable              | `boolean`                            | true   | 可选，弹框是否可拖拽                       |
+| show-animation         | `boolean`                            | true   | 可选，是否显示动画                         |
+| show-overlay           | `boolean`                            | true   | 可选，是否展示遮罩层                       |                                               |
+| append-to-body         | `boolean`                            | true   | 可选，是否将 Modal 提升到 body 层          |                                               |
+| type                   | success \| failed \| warning \| info | -      | 可选，弹框信息提示                         |
 
-### d-modal 插槽
+### Modal 插槽
 
-| 名称    | 说明              |
-| ------- | ----------------- |
-| default | Modal 内容        |
-| header  | 自定义 Modal 顶部 |
-| footer  | 自定义 Modal 底部 |
+| 插槽名  | 说明                                                      |
+| :------ | :-------------------------------------------------------- |
+| default | Modal 内容                                                |
+| header  | 自定义 Modal 顶部，使用 title 和 header 会优先渲染 header |
+| footer  | 自定义 Modal 底部                                         |

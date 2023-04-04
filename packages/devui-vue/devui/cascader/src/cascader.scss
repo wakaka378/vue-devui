@@ -1,13 +1,12 @@
-@import '../../style/mixins/size';
 @import '../../style/mixins/flex';
-@import '../../style/theme/color';
+@import '../../styles-var/devui-var.scss';
 
-.devui-cascader {
+.#{$devui-prefix}-cascader {
   @include flex(flex-start);
 
   position: relative;
 
-  >div:nth-child(1) {
+  > div:nth-child(1) {
     width: 100%;
   }
 
@@ -24,6 +23,10 @@
     }
   }
 
+  &__close {
+    cursor: pointer;
+  }
+
   &__disbaled {
     .icon {
       color: $devui-disabled-text !important;
@@ -35,43 +38,52 @@
     padding-right: 16px;
   }
 
-  .devui-drop-menu-wrapper {
+  &__drop-menu-wrapper {
     display: block;
-    margin: 4px 0;
     font-size: 0;
     white-space: nowrap;
     padding: 0;
   }
-}
 
-.devui-drop-icon-animation {
-  transition: transform 0.2s linear;
-}
+  &--drop-icon-animation {
+    transition: transform 0.2s linear;
+  }
 
-.devui-drop-menu-animation {
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-  // opacity: 0;
-  // position: absolute;
-  // float: left;
-  z-index: 1000;
-  // transform: scaleY(0.7) translateY(-5px);
-  margin-top: 1px;
+  &__drop-menu-animation {
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  }
 
-  .devui-dropdown-menu {
+  &__dropdown-menu {
     width: auto;
     padding-bottom: 0;
     @include flex('flex-start');
   }
-}
 
-.devui-dropdown__open {
-  .devui-cascader__icon {
-    transform: rotate(180deg);
+  &__panel {
+    padding: 12px 12px;
+    max-height: 300px;
+    overflow-y: auto;
   }
 
-  .devui-drop-menu-animation {
-    transform-origin: 0 0%;
-    transform: scaleY(0.9999) translateY(0);
-    opacity: 1;
+  &__suggest-list {
+    height: 32px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    cursor: pointer;
+    font-weight: 400;
+    font-size: $devui-font-size;
+    text-align: left;
+    border-radius: $devui-border-radius;
+
+    &:hover {
+      color: $devui-brand-active;
+      background-color: $devui-list-item-hover-bg;
+    }
+  }
+}
+
+.#{$devui-prefix}-cascader__dropdown--open {
+  .#{$devui-prefix}-cascader--drop-icon-animation {
+    transform: rotate(180deg);
   }
 }

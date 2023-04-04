@@ -1,16 +1,15 @@
 import type { PropType, ExtractPropTypes, Ref, ComputedRef } from 'vue';
 
-export type Size = 'lg' | 'sm' | '';
+export type Size = 'lg' | 'md' | 'sm';
 export type IconPosition = 'right' | 'left';
 
 export const searchProps = {
   size: {
-    type: String as PropType<Size>,
-    default: '',
+    type: String as PropType<Size>
   },
   placeholder: {
     type: String,
-    default: '请输入关键字',
+    default: '',
   },
   maxLength: {
     type: Number,
@@ -55,6 +54,11 @@ export const searchProps = {
 } as const;
 
 export type SearchProps = ExtractPropTypes<typeof searchProps>;
+
+export interface UseSearchClassTypes {
+  rootClass: ComputedRef<{ [p: string]: string | boolean }>;
+  searchSize: ComputedRef<Size>;
+}
 
 export interface KeywordsReturnTypes {
   keywords: Ref<string>;

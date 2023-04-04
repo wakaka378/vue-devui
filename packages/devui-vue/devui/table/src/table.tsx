@@ -1,43 +1,74 @@
-import { provide, defineComponent, getCurrentInstance, computed, toRef } from 'vue';
-import { Table, TableProps, TablePropsTypes, TABLE_TOKEN } from './table-types';
-import { useTable } from './composable/use-table';
+import { provide, defineComponent, getCurrentInstance, computed, toRef, ref, onMounted, nextTick, withModifiers } from 'vue';
+import type { SetupContext } from 'vue';
+import { tableProps, TableProps, TABLE_TOKEN, ITableInstanceAndDefaultRow } from './table-types';
+import { useTable, useTableLayout, useTableWatcher } from './composables/use-table';
+import { useHorizontalScroll } from './composables/use-horizontal-scroll';
 import { createStore } from './store';
 import FixHeader from './components/fix-header';
 import NormalHeader from './components/normal-header';
-import { Loading } from '../../loading';
+import { LoadingDirective } from '../../loading';
 import { useNamespace } from '../../shared/hooks/use-namespace';
 import './table.scss';
+
+let tableIdInit = 1;
 
 export default defineComponent({
   name: 'DTable',
   directives: {
-    dLoading: Loading,
+    Loading: LoadingDirective,
   },
-  props: TableProps,
-  setup(props: TablePropsTypes, ctx) {
-    const table = getCurrentInstance() as Table;
-    const store = createStore(toRef(props, 'data'));
+  props: tableProps,
+  emits: ['sort-change', 'cell-click', 'row-click', 'check-change', 'check-all-change', 'expand-change', 'load-more'],
+  setup(props: TableProps, ctx: SetupContext) {
+    const table = getCurrentInstance() as ITableInstanceAndDefaultRow;
+    const store = createStore(toRef(props, 'data'), table, ctx);
+    const tableId = `devui-table_${tableIdInit++}`;
+    const tableRef = ref();
+    table.tableId = tableId;
     table.store = store;
-    provide(TABLE_TOKEN, table);
-    const { classes, style } = useTable(props);
+    provide<ITableInstanceAndDefaultRow>(TABLE_TOKEN, table);
+    const { tableWidth, updateColumnWidth } = useTableLayout(table);
+    const { classes, styles } = useTable(props, tableWidth);
+    const { onTableScroll } = useHorizontalScroll(table);
+    useTableWatcher(props, store);
     const isEmpty = computed(() => props.data.length === 0);
     const ns = useNamespace('table');
+    const hiddenColumns = ref(null);
+    table.hiddenColumns = hiddenColumns;
+    table.tableRef = tableRef;
+    table.updateColumnWidth = updateColumnWidth;
 
     ctx.expose({
-      getCheckedRows() {
-        return store.getCheckedRows();
-      },
+      store,
+    });
+
+    onMounted(async () => {
+      await nextTick();
+      store.updateColumns();
+      store.updateFirstDefaultColumn();
+      store.updateRows();
+      updateColumnWidth();
+      window.addEventListener('resize', updateColumnWidth);
     });
 
     return () => (
-      <div class={ns.b()} style={style.value} v-dLoading={props.showLoading}>
-        {ctx.slots.default?.()}
-        {props.fixHeader ? (
-          <FixHeader classes={classes.value} is-empty={isEmpty.value} />
-        ) : (
-          <NormalHeader classes={classes.value} is-empty={isEmpty.value} />
-        )}
-        {isEmpty.value && <div class={ns.e('empty')}>No Data</div>}
+      <div
+        ref={tableRef}
+        class={ns.b()}
+        style={styles.value}
+        v-loading={props.showLoading}
+        onScroll={withModifiers(onTableScroll, ['stop'])}>
+        <div class={ns.e('container')}>
+          <div ref={hiddenColumns} class="hidden-columns">
+            {ctx.slots.default?.()}
+          </div>
+          {props.fixHeader ? (
+            <FixHeader classes={classes.value} is-empty={isEmpty.value} />
+          ) : (
+            <NormalHeader classes={classes.value} is-empty={isEmpty.value} />
+          )}
+          {isEmpty.value && <div class={ns.e('empty')}>{ctx.slots.empty ? ctx.slots.empty() : props.empty}</div>}
+        </div>
       </div>
     );
   },

@@ -1,7 +1,7 @@
 import { toRefs, ref, computed, watch, onUnmounted, onMounted } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { debounce } from 'lodash';
-import { PopoverProps } from './popover-types';
+import { PopoverProps, UsePopoverEvent } from './popover-types';
 
 const TransformOriginMap: Record<string, string> = {
   top: '50% calc(100% + 8px)',
@@ -19,15 +19,12 @@ export function usePopover(
 ): { overlayStyles: ComputedRef<Record<string, number | string>> } {
   const { trigger, isOpen } = toRefs(props);
   const overlayStyles = computed(() => ({
-    zIndex: 1060,
+    zIndex: 'var(--devui-z-index-pop-up, 1060)',
     transformOrigin: TransformOriginMap[placement.value],
   }));
 
   const onDocumentClick: (e: Event) => void = (e: Event) => {
-    if (
-      !origin.value?.contains(<HTMLElement>e.target) &&
-      !popoverRef.value.$el?.contains(e.target)
-    ) {
+    if (!origin.value?.contains(<HTMLElement>e.target) && !popoverRef.value.$el?.contains(e.target)) {
       visible.value = false;
     }
   };
@@ -50,17 +47,18 @@ export function usePopover(
   return { overlayStyles };
 }
 
-export function usePopoverEvent(
-  props: PopoverProps,
-  visible: Ref<boolean>,
-  origin: Ref
-): { placement: Ref<string>; handlePositionChange: (pos: string) => void } {
-  const { trigger, position, mouseEnterDelay, mouseLeaveDelay } = toRefs(props);
+export function usePopoverEvent(props: PopoverProps, visible: Ref<boolean>, origin: Ref): UsePopoverEvent {
+  const { trigger, position, mouseEnterDelay, mouseLeaveDelay, disabled } = toRefs(props);
   const isClick: ComputedRef<boolean> = computed(() => trigger.value === 'click');
   const placement: Ref<string> = ref(position.value[0].split('-')[0]);
   const isEnter: Ref<boolean> = ref(false);
 
-  const onClick = () => isClick.value && (visible.value = !visible.value);
+  const onClick = () => {
+    if (disabled.value) {
+      return;
+    }
+    isClick.value && (visible.value = !visible.value);
+  };
   const enter = debounce(() => {
     isEnter.value && (visible.value = true);
   }, mouseEnterDelay.value);
@@ -68,6 +66,9 @@ export function usePopoverEvent(
     !isEnter.value && (visible.value = false);
   }, mouseLeaveDelay.value);
   const onMouseenter = () => {
+    if (disabled.value) {
+      return;
+    }
     if (!isClick.value) {
       isEnter.value = true;
       enter();
@@ -79,6 +80,15 @@ export function usePopoverEvent(
       leave();
     }
   };
+  const quickLeave = () => {
+    isEnter.value = false;
+    visible.value = false;
+  };
+  watch(disabled, (newVal) => {
+    if (newVal && visible.value) {
+      quickLeave();
+    }
+  });
   const handlePositionChange: (pos: string) => void = (pos: string) => {
     placement.value = pos.split('-')[0];
   };
@@ -91,5 +101,5 @@ export function usePopoverEvent(
     }
   });
 
-  return { placement, handlePositionChange };
+  return { placement, handlePositionChange, onMouseenter, onMouseleave };
 }

@@ -2,7 +2,7 @@
 
 倒计时
 
-### 何时使用
+#### 何时使用
 
 当倒计时时使用
 
@@ -23,7 +23,7 @@ import { defineComponent, ref } from 'vue'
 
 export default defineComponent({
   setup() {
-    const deadline = ref(Date.now() + 100 *1000);
+    const deadline = ref(Date.now() + 100 * 1000);
     const changeTime = (n) => {
     }
     const finishTime = () => {
@@ -61,7 +61,7 @@ import { defineComponent, ref } from 'vue'
 
 export default defineComponent({
   setup() {
-    const deadline = ref(Date.now() + 2 * 60 * 60 *1000);
+    const deadline = ref(Date.now() + 2 * 60 * 60 * 1000);
     const changeTime = (n) => {
     }
     const finishTime = () => {
@@ -99,7 +99,7 @@ import { defineComponent, ref } from 'vue'
 
 export default defineComponent({
   setup() {
-    const deadline = ref(new Date().getTime() + 369 * 24 * 60 * 60 *1000 + 5000);
+    const deadline = ref(new Date().getTime() + 369 * 24 * 60 * 60 * 1000 + 5000);
 
     const changeTime = (n) => {
     }
@@ -123,8 +123,8 @@ export default defineComponent({
 
 
 
-注：当format某一项时间没有的情况下，会将没有的那一项值累积到下一项。 
-例如：当没有M(月)的时候，会将月的值*30累加到日，根据format格式化的值会从通过时间onchange的legalTime值返回，如下：
+注：当 format 某一项时间没有的情况下，会将没有的那一项值累积到下一项。 
+例如：当没有 M(月)的时候，会将月的值 *30 累加到日，根据 format 格式化的值会从通过时间 onchange 的 legalTime 值返回，如下：
 :::demo 
 
 ```vue
@@ -238,7 +238,7 @@ export default defineComponent({
 :::
 
 
-### 插槽
+### 自定义内容
 :::demo 
 
 ```vue
@@ -304,23 +304,26 @@ export default defineComponent({
 ```
 :::
 
-### d-countdown
-
-d-countdown 参数
+### Countdown 参数
 
 | 参数 | 类型 | 默认 | 说明 | 跳转demo |
-| ---- | ---- | ---- | ---- | ---- |
+| :---- | :---- | :---- | :---- | :---- |
 |   format   |   string   |     HH:mm:ss      |   格式化倒计时展示，参考moment   |   [时间格式](#时间格式) |
 |   value   |   number   |   -   |   数值内容	   |   [基本用法](#基本用法) |
 |   prefix   |   string   |   -   |   设置数值的前缀	   |   [前缀和后缀](#前缀和后缀) |
 |   suffix   |   string   |   -   |   设置数值的后缀		   |   [前缀和后缀](#前缀和后缀) |
-|   valueStyle   |   CSSProperties   |   -   |   设置数值的样式		   |   [设置style](#设置style) |
+|   value-style   |   CSSProperties   |   -   |   设置数值的样式		   |   [设置style](#设置style) |
 
 
-d-countdown 事件
+### Countdown 事件
 
 | 事件 | 类型 | 说明 |
-| ---- | ---- | ---- |
-|   onChange   |   ({leftTime,formatTime,legalTime}) => void   |   倒计时时间变化时触发。leftTime:倒计时剩余得时间戳；formatTime：年月日时分秒毫秒格式倒计时；legalTime：根据format格式化后的值。	   |
-|   onFinish   |   () => void   |   倒计时完成时触发	   |
+| :---- | :---- | :---- |
+|   on-change   |   ({leftTime,formatTime,legalTime}) => void   |   倒计时时间变化时触发。<br>leftTime:倒计时剩余得时间戳；<br>formatTime：年月日时分秒毫秒格式倒计时；<br>legalTime：根据format格式化后的值。	   |
+|   on-finish   |   () => void   |   倒计时完成时触发	   |
 
+### Countdown 插槽
+
+| 插槽名    | 说明              |
+| :------- | :----------------- |
+| default | 自定义内容        |

@@ -1,89 +1,63 @@
-import { watch, Ref, ref, computed } from 'vue';
-import { Column, CompareFn, FilterResults } from '../components/column/column-types';
-import { SortDirection } from '../table-types';
-export interface TableStore<T = Record<string, any>> {
-  states: {
-    _data: Ref<T[]>;
-    _columns: Ref<Column[]>;
-    _checkList: Ref<boolean[]>;
-    _checkAll: Ref<boolean>;
-    _halfChecked: Ref<boolean>;
-    isFixedLeft: Ref<boolean>;
-  };
-  insertColumn(column: Column): void;
-  sortColumn(): void;
-  removeColumn(column: Column): void;
-  getCheckedRows(): T[];
-  sortData(field: string, direction: SortDirection, compareFn: CompareFn<T>): void;
-  filterData(field: string, results: FilterResults): void;
-  resetFilterData(): void;
+import { watch, Ref, ref, computed, unref } from 'vue';
+import type { SetupContext } from 'vue';
+import { isBoolean } from '../../../shared/utils';
+import type { Column, LevelColumn } from '../components/column/column-types';
+import type { DefaultRow, ITable, RowKeyType } from '../table-types';
+import type { TableStore } from './store-types';
+import { useExpand } from './use-expand';
+import { useEditTableCell } from './use-edit-table-cell';
+import { getRowIdentity } from '../utils';
+import { useSort } from '../composables/use-sort';
+
+function replaceColumn(array: LevelColumn[], column: LevelColumn) {
+  return array.map((item) => {
+    if (item.id === column.id) {
+      return column;
+    } else if (item.children?.length) {
+      item.children = replaceColumn(item.children, column);
+    }
+    return item;
+  });
 }
 
-export function createStore<T>(dataSource: Ref<T[]>): TableStore<T> {
-  const _data: Ref<T[]> = ref([]);
-  watch(
-    dataSource,
-    (value: T[]) => {
-      _data.value = [...value];
-    },
-    { deep: true, immediate: true }
-  );
-
-  const { _columns, insertColumn, removeColumn, sortColumn } = createColumnGenerator();
-  const { _checkAll, _checkList, _halfChecked, getCheckedRows } = createSelection(dataSource, _data);
-  const { sortData } = createSorter(dataSource, _data);
-  const { filterData, resetFilterData } = createFilter(dataSource, _data);
-
-  const { isFixedLeft } = createFixedLogic(_columns);
-
-  return {
-    states: {
-      _data,
-      _columns,
-      _checkList,
-      _checkAll,
-      _halfChecked,
-      isFixedLeft,
-    },
-    insertColumn,
-    sortColumn,
-    removeColumn,
-    getCheckedRows,
-    sortData,
-    filterData,
-    resetFilterData,
-  };
+function doFlattenColumns(columns: LevelColumn[]) {
+  const result: LevelColumn[] = [];
+  columns.forEach((column: LevelColumn) => {
+    if (column.children) {
+      // eslint-disable-next-line prefer-spread
+      result.push.apply(result, doFlattenColumns(column.children));
+    } else {
+      result.push(column);
+    }
+  });
+  return result;
 }
 
-/**
- * 列生成器
- * @returns
- */
-const createColumnGenerator = () => {
+function createColumnGenerator() {
   const _columns: Ref<Column[]> = ref([]);
+  const flatColumns: Ref<Column[]> = ref([]);
 
-  /**
-   * 插入当前列
-   * @param {Column} column
-   */
-  const insertColumn = (column: Column) => {
-    _columns.value.push(column);
-    // 实际上就是插入排序
-    _columns.value.sort((a, b) => a.order - b.order);
-  };
-
-  /**
-   * 对 column 进行排序
-   */
   const sortColumn = () => {
-    _columns.value.sort((a, b) => (a.order > b.order ? 1 : -1));
+    _columns.value.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   };
 
-  /**
-   * 移除当前列
-   * @param {Column} column
-   * @returns
-   */
+  const insertColumn = (column: LevelColumn, parent: LevelColumn) => {
+    const array = unref(_columns);
+    let newColumns = [];
+    if (!parent) {
+      array.push(column);
+      newColumns = array;
+    } else {
+      if (parent && !parent.children) {
+        parent.children = [];
+      }
+      parent?.children?.push(column);
+      newColumns = replaceColumn(array, parent);
+    }
+    sortColumn();
+    _columns.value = newColumns;
+  };
+
   const removeColumn = (column: Column) => {
     const i = _columns.value.findIndex((v) => v === column);
     if (i === -1) {
@@ -91,50 +65,144 @@ const createColumnGenerator = () => {
     }
     _columns.value.splice(i, 1);
   };
-  return { _columns, insertColumn, removeColumn, sortColumn };
-};
 
-/**
- * 选择功能
- * @param dataSource
- * @param _data
- * @returns
- */
-const createSelection = <T>(dataSource: Ref<T[]>, _data: Ref<T[]>) => {
-  const _checkList: Ref<boolean[]> = ref([]);
+  const updateColumns = () => {
+    flatColumns.value = ([] as LevelColumn[]).concat(doFlattenColumns(_columns.value));
+  };
+
+  return {
+    _columns,
+    flatColumns,
+    insertColumn,
+    removeColumn,
+    sortColumn,
+    updateColumns,
+  };
+}
+
+function doFlattenRows<T extends Record<string, unknown>>(
+  dataList: T[],
+  level: number,
+  rowKey: RowKeyType,
+  rowLevelMap: Ref<Record<string, number>>,
+  hiddenRowKeys: Ref<string[]>
+) {
+  const result: T[] = [];
+  dataList.forEach((data: T) => {
+    result.push(data);
+    if (level > 0) {
+      const key = getRowIdentity(data as Record<string, unknown>, rowKey);
+      rowLevelMap.value[key] = level;
+      hiddenRowKeys.value.push(key);
+    }
+    if ((data as Record<string, unknown>).children) {
+      rowLevelMap.value[getRowIdentity(data as Record<string, unknown>, rowKey)] = level;
+      // eslint-disable-next-line prefer-spread
+      result.push.apply(result, doFlattenRows<T>(data.children as T[], level + 1, rowKey, rowLevelMap, hiddenRowKeys));
+    }
+  });
+  return result;
+}
+
+function createRowGenerator<T extends Record<string, unknown>>(dataSource: Ref<T[]>, rowKey: RowKeyType, flatColumns: Ref<Column[]>) {
+  const flatRows: Ref<T[]> = ref([]);
+  const hiddenRowKeys: Ref<string[]> = ref([]);
+  const rowLevelMap: Ref<Record<string, number>> = ref({});
+  const firstDefaultColumn: Ref<string> = ref('');
+
+  const updateRows = () => {
+    // 暂不支持展开行(column的type==expand)和树形表格同时使用，展开行优先级高
+    const hasExpand = flatColumns.value.some((column) => column.type === 'expand');
+    const result = hasExpand ? dataSource.value : doFlattenRows<T>(dataSource.value, 0, rowKey, rowLevelMap, hiddenRowKeys);
+    flatRows.value = ([] as T[]).concat(result);
+  };
+
+  const updateFirstDefaultColumn = () => {
+    const index = flatColumns.value.findIndex((column) => column.type === '');
+    firstDefaultColumn.value = index !== -1 ? flatColumns.value[index].id : '';
+  };
+
+  return {
+    flatRows,
+    hiddenRowKeys,
+    rowLevelMap,
+    updateRows,
+    firstDefaultColumn,
+    updateFirstDefaultColumn,
+  };
+}
+
+function createSelection<T extends Record<string, unknown>>(dataSource: Ref<T[]>, rowKey: RowKeyType, flatRows: Ref<T[]>) {
+  const _checkSet: Ref<Set<string>> = ref(new Set());
+  const checkRow = (toggle: boolean, row: T, index: number) => {
+    const key = getRowIdentity(row as Record<string, unknown>, rowKey, index);
+    if (toggle) {
+      _checkSet.value.add(key);
+    } else {
+      _checkSet.value.delete(key);
+    }
+  };
+
+  const toggleRowSelection = (row: T, checked?: boolean, index?: number) => {
+    const key = getRowIdentity(row as Record<string, unknown>, rowKey, index);
+    const isIncluded = _checkSet.value.has(key);
+
+    const addRow = () => {
+      _checkSet.value.add(key);
+    };
+
+    const deleteRow = () => {
+      _checkSet.value.delete(key);
+    };
+
+    if (isBoolean(checked)) {
+      if (checked && !isIncluded) {
+        addRow();
+      } else if (!checked && isIncluded) {
+        deleteRow();
+      }
+    } else {
+      if (isIncluded) {
+        deleteRow();
+      } else {
+        addRow();
+      }
+    }
+  };
+
+  const isRowChecked = (row: T, index: number) => {
+    return _checkSet.value.has(getRowIdentity(row as Record<string, unknown>, rowKey, index));
+  };
+
+  const getCheckedRows = (): T[] => {
+    return flatRows.value.filter((item, index) => isRowChecked(item, index));
+  };
+
   const _checkAllRecord: Ref<boolean> = ref(false);
   const _checkAll: Ref<boolean> = computed({
     get: () => _checkAllRecord.value,
     set: (val: boolean) => {
       _checkAllRecord.value = val;
-      // 只有在 set 的时候变更 _checkList 的数据
-      for (let i = 0; i < _checkList.value.length; i++) {
-        _checkList.value[i] = val;
-      }
+      dataSource.value.forEach((item, index) => {
+        checkRow(val, item, index);
+      });
     },
   });
   const _halfChecked = ref(false);
 
   watch(
-    dataSource,
-    (value: T[]) => {
-      _checkList.value = new Array(value.length).fill(false);
-    },
-    { deep: true, immediate: true }
-  );
-
-  // checkList 只有全为true的时候
-  watch(
-    _checkList,
-    (list) => {
-      if (list.length === 0) {
+    _checkSet,
+    (set) => {
+      if (set.size === 0) {
         return;
       }
       let allTrue = true;
       let allFalse = true;
-      for (let i = 0; i < list.length; i++) {
-        allTrue &&= list[i];
-        allFalse &&= !list[i];
+      const items = flatRows.value;
+      for (let i = 0; i < items.length; i++) {
+        const checked = isRowChecked(items[i], i);
+        allTrue &&= checked;
+        allFalse &&= !checked;
       }
 
       _checkAllRecord.value = allTrue;
@@ -143,87 +211,107 @@ const createSelection = <T>(dataSource: Ref<T[]>, _data: Ref<T[]>) => {
     { immediate: true, deep: true }
   );
 
-  /**
-   * 获取当前已选数据
-   * @returns {T[]}
-   */
-  const getCheckedRows = (): T[] => {
-    return _data.value.filter((_, index) => _checkList.value[index]);
-  };
+  watch(dataSource, (value) => {
+    _checkAllRecord.value = value.findIndex((item, index) => !isRowChecked(item, index)) === -1;
+  });
 
   return {
-    _checkList,
+    _checkSet,
     _checkAll,
     _halfChecked,
     getCheckedRows,
+    checkRow,
+    isRowChecked,
+    toggleRowSelection,
   };
-};
+}
 
-/**
- * 排序功能
- * @template T
- * @param dataSource
- * @param _data
- */
-const createSorter = <T>(dataSource: Ref<T[]>, _data: Ref<T[]>) => {
-  /**
-   * 对数据进行排序
-   * @param {string} field
-   * @param {SortDirection} direction
-   * @param {CompareFn<T>} compareFn
-   */
-  const sortData = (
-    field: string,
-    direction: SortDirection,
-    compareFn: CompareFn<T> = (fieldKey: string, a: T, b: T) => a[fieldKey] > b[fieldKey]
-  ) => {
-    if (direction === 'ASC') {
-      _data.value = _data.value.sort((a, b) => (compareFn(field, a, b) ? 1 : -1));
-    } else if (direction === 'DESC') {
-      _data.value = _data.value.sort((a, b) => (!compareFn(field, a, b) ? 1 : -1));
-    } else {
-      _data.value = [...dataSource.value];
-    }
-  };
-  return { sortData };
-};
-
-/**
- * 过滤功能
- * @template T
- * @param dataSource
- * @param _data
- * @returns
- */
-const createFilter = <T>(dataSource: Ref<T[]>, _data: Ref<T[]>) => {
-  // 过滤数据所需要的
-  const fieldSet = new Set<string>();
-  /**
-   * 过滤数据
-   */
-  const filterData = (field: string, results: FilterResults) => {
-    fieldSet.add(field);
-    const fields = [...fieldSet];
-    _data.value = dataSource.value.filter((item) => {
-      return fields.reduce<boolean>((prev, fieldKey) => {
-        return prev && results.indexOf(item[fieldKey]) !== -1;
-      }, true);
-    });
-  };
-  /**
-   * 重置数据为最开始的状态
-   */
-  const resetFilterData = () => {
-    fieldSet.clear();
-    _data.value = [...dataSource.value];
-  };
-  return { filterData, resetFilterData };
-};
-
-const createFixedLogic = (columns: Ref<Column[]>) => {
+function createFixedLogic(columns: Ref<Column[]>) {
   const isFixedLeft = computed(() => {
     return columns.value.reduce((prev, current) => prev || !!current.fixedLeft, false);
   });
 
   return { isFixedLeft };
-};
+}
+
+/**
+ * 创建 TableStore
+ * @param dataSource 数据源
+ * @param table 表对象
+ * @returns TableStore
+ */
+export function createStore<T extends Record<string, unknown>>(
+  dataSource: Ref<T[]>,
+  table: ITable<DefaultRow>,
+  ctx: SetupContext
+): TableStore<T> {
+  const _data: Ref<T[]> = ref([]);
+  const { _columns, flatColumns, insertColumn, removeColumn, sortColumn, updateColumns } = createColumnGenerator();
+  const { flatRows, hiddenRowKeys, rowLevelMap, updateRows, firstDefaultColumn, updateFirstDefaultColumn } = createRowGenerator<T>(
+    dataSource,
+    table.props.rowKey as RowKeyType,
+    flatColumns
+  );
+
+  const { _checkAll, _checkSet, _halfChecked, getCheckedRows, isRowChecked, checkRow, toggleRowSelection } = createSelection<T>(
+    _data,
+    table.props.rowKey as RowKeyType,
+    flatRows
+  );
+
+  const { thList, collectTh, sortData } = useSort(dataSource, flatRows);
+
+  const { isFixedLeft } = createFixedLogic(_columns);
+  const { isRowExpanded, updateExpandRows, setExpandRows, toggleRowExpansion } = useExpand(_data, table);
+
+  const { tableCellModeMap, setCellMode, resetCellMode } = useEditTableCell();
+
+  const emitTableEvent = (eventName: string, ...params: unknown[]) => {
+    ctx.emit.apply(ctx, [eventName, ...params]);
+  };
+
+  watch(
+    dataSource,
+    (value: T[]) => {
+      _data.value = [...value];
+      updateExpandRows();
+    },
+    { deep: true, immediate: true }
+  );
+
+  return {
+    states: {
+      _data,
+      flatRows,
+      hiddenRowKeys,
+      rowLevelMap,
+      _columns,
+      flatColumns,
+      _checkSet,
+      _checkAll,
+      _halfChecked,
+      isFixedLeft,
+      thList,
+      firstDefaultColumn,
+      tableCellModeMap,
+    },
+    insertColumn,
+    sortColumn,
+    removeColumn,
+    updateColumns,
+    updateRows,
+    getCheckedRows,
+    collectTh,
+    sortData,
+    isRowChecked,
+    checkRow,
+    isRowExpanded,
+    setExpandRows,
+    toggleRowExpansion,
+    toggleRowSelection,
+    updateFirstDefaultColumn,
+    setCellMode,
+    resetCellMode,
+    emitTableEvent,
+  };
+}

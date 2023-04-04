@@ -1,10 +1,26 @@
 import { ref, nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
-import { CarouselItem, Carousel  } from '../index';
+import { CarouselItem, Carousel } from '../index';
 import { Button } from '../../button';
+import { useNamespace } from '../../shared/hooks/use-namespace';
+import { wait } from '../../shared/utils';
 
-const wait = (ms = 100) =>
-  new Promise(resolve => setTimeout(() => resolve(), ms));
+jest.mock('../../locale/create', () => ({
+  createI18nTranslate: () => jest.fn(),
+}));
+
+const ns = useNamespace('carousel', true);
+const button = useNamespace('button', true);
+
+const baseClass = ns.b();
+const arrowClass = ns.e('arrow');
+const dotsClass = ns.e('dots');
+
+const dotItemClass = '.dot-item';
+const arrowLeftClass = '.arrow-left';
+const arrowRightClass = '.arrow-right';
+
+const buttonBaseClass = button.b();
 
 describe('d-carousel', () => {
   it('arrowTrigger-never', () => {
@@ -14,7 +30,7 @@ describe('d-carousel', () => {
         height: '200px',
       },
     });
-    expect(wrapper.find('.devui-carousel-arrow').exists()).toBe(false);
+    expect(wrapper.find(arrowClass).exists()).toBe(false);
   });
 
   it('arrowTrigger-hover-out', () => {
@@ -24,8 +40,9 @@ describe('d-carousel', () => {
         height: '200px',
       },
     });
-    expect(wrapper.find('.devui-carousel-arrow').exists()).toBe(false);
+    expect(wrapper.find(arrowClass).exists()).toBe(false);
   });
+
   it('arrowTrigger-hover-in', async () => {
     const wrapper = mount(Carousel, {
       props: {
@@ -33,9 +50,9 @@ describe('d-carousel', () => {
         height: '200px',
       },
     });
-    wrapper.find('.devui-carousel-container').trigger('mouseenter');
+    wrapper.find(baseClass).trigger('mouseenter');
     await nextTick();
-    expect(wrapper.find('.devui-carousel-arrow').exists()).toBe(true);
+    expect(wrapper.find(arrowClass).exists()).toBe(true);
   });
 
   it('arrowTrigger-always', () => {
@@ -45,7 +62,7 @@ describe('d-carousel', () => {
         height: '200px',
       },
     });
-    expect(wrapper.find('.devui-carousel-arrow').exists()).toBe(true);
+    expect(wrapper.find(arrowClass).exists()).toBe(true);
   });
 
   it('showDots-false', () => {
@@ -55,7 +72,7 @@ describe('d-carousel', () => {
         height: '200px',
       },
     });
-    expect(wrapper.find('.devui-carousel-dots').exists()).toBe(false);
+    expect(wrapper.find(dotsClass).exists()).toBe(false);
   });
 
   it('showDots-click', async () => {
@@ -65,7 +82,7 @@ describe('d-carousel', () => {
         'd-carousel-item': CarouselItem,
       },
       template: `
-        <d-carousel ref="carousel" height="200px" :activeIndexChange="onChange">
+        <d-carousel ref="carousel" height="200px" @activeIndexChange="onChange">
           <d-carousel-item>Page 1</d-carousel-item>
           <d-carousel-item>Page 2</d-carousel-item>
           <d-carousel-item>Page 3</d-carousel-item>
@@ -81,14 +98,13 @@ describe('d-carousel', () => {
 
         return {
           activeIndex,
-
           onChange,
         };
-      }
+      },
     });
 
     await nextTick();
-    wrapper.findAll('.dot-item')[1].trigger('click');
+    wrapper.findAll(dotItemClass)[1].trigger('click');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(1);
   });
@@ -100,7 +116,7 @@ describe('d-carousel', () => {
         'd-carousel-item': CarouselItem,
       },
       template: `
-        <d-carousel ref="carousel" height="200px" :activeIndexChange="onChange" dotTrigger="hover">
+        <d-carousel ref="carousel" height="200px" @activeIndexChange="onChange" dotTrigger="hover">
           <d-carousel-item>Page 1</d-carousel-item>
           <d-carousel-item>Page 2</d-carousel-item>
           <d-carousel-item>Page 3</d-carousel-item>
@@ -116,13 +132,12 @@ describe('d-carousel', () => {
 
         return {
           activeIndex,
-
           onChange,
         };
-      }
+      },
     });
     await nextTick();
-    wrapper.findAll('.dot-item')[1].trigger('mouseenter');
+    wrapper.findAll(dotItemClass)[1].trigger('mouseenter');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(1);
   });
@@ -135,7 +150,7 @@ describe('d-carousel', () => {
         'd-button': Button,
       },
       template: `
-        <d-carousel ref="carousel" height="200px" arrowTrigger="always" :activeIndexChange="onChange">
+        <d-carousel ref="carousel" height="200px" arrowTrigger="always" @activeIndexChange="onChange">
           <d-carousel-item v-for="item in items" :key="item">{{ item }} </d-carousel-item>
         </d-carousel>
         <div class="carousel-demo-operate">
@@ -173,28 +188,28 @@ describe('d-carousel', () => {
           onGoFirst,
           onChange,
         };
-      }
+      },
     });
 
     await nextTick();
-    wrapper.find('.arrow-left').trigger('click');
+    wrapper.find(arrowLeftClass).trigger('click');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(3);
-    wrapper.find('.arrow-right').trigger('click');
+    wrapper.find(arrowRightClass).trigger('click');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(0);
 
-    wrapper.findAll('.devui-btn')[0].trigger('click');
+    wrapper.findAll(buttonBaseClass)[0].trigger('click');
     await nextTick();
-    wrapper.findAll('.devui-btn')[0].trigger('click');
+    wrapper.findAll(buttonBaseClass)[0].trigger('click');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(2);
 
-    wrapper.findAll('.devui-btn')[1].trigger('click');
+    wrapper.findAll(buttonBaseClass)[1].trigger('click');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(3);
 
-    wrapper.findAll('.devui-btn')[2].trigger('click');
+    wrapper.findAll(buttonBaseClass)[2].trigger('click');
     await nextTick();
     expect(wrapper.vm.activeIndex).toBe(0);
   });
@@ -206,7 +221,7 @@ describe('d-carousel', () => {
         'd-carousel-item': CarouselItem,
       },
       template: `
-        <d-carousel ref="carousel" height="200px" :activeIndexChange="onChange" autoplay :autoplaySpeed="3000">
+        <d-carousel ref="carousel" height="200px" @activeIndexChange="onChange" autoplay :autoplaySpeed="2000">
           <d-carousel-item>Page 1</d-carousel-item>
           <d-carousel-item>Page 2</d-carousel-item>
           <d-carousel-item>Page 3</d-carousel-item>
@@ -222,15 +237,14 @@ describe('d-carousel', () => {
 
         return {
           activeIndex,
-
           onChange,
         };
-      }
+      },
     });
 
-    await wait(4500);
+    await wait(2100);
     expect(wrapper.vm.activeIndex).toBe(1);
-    await wait(4600);
-    expect(wrapper.vm.activeIndex).toBe(3);
-  }, 10000);
+    await wait(2100);
+    expect(wrapper.vm.activeIndex).toBe(2);
+  });
 });

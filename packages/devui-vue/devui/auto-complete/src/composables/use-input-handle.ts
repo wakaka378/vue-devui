@@ -1,63 +1,80 @@
 import { ref, Ref, SetupContext } from 'vue';
-import {HandleSearch,RecentlyFocus,InputDebounceCb,TransInputFocusEmit} from '../auto-complete-types';
+import {
+  HandleSearch,
+  RecentlyFocus,
+  InputDebounceCb,
+  TransInputFocusEmit,
+  SourceType,
+  UseInputHandle,
+} from '../auto-complete-types';
 export default function useInputHandle(
   ctx: SetupContext,
-  searchList: Ref<any[]>,
+  searchList: Ref<SourceType>,
   showNoResultItemTemplate: Ref<boolean>,
   modelValue: Ref<string>,
-  disabled: Ref<boolean>,
+  isDisabled: Ref<boolean>,
   delay: Ref<number>,
   handleSearch: HandleSearch,
   transInputFocusEmit: Ref<TransInputFocusEmit>,
   recentlyFocus: RecentlyFocus,
-  latestSource: Ref<Array<any>>
-): any {
+  latestSource: Ref
+): UseInputHandle {
   const visible = ref(false);
   const inputRef = ref();
   const searchStatus = ref(false);
-  const debounce =(cb: InputDebounceCb,time: number) =>{
+  const isFocus = ref(false);
+  const debounce = (cb: InputDebounceCb, time: number) => {
     let timer: NodeJS.Timeout | null;
-    return (...args: any)=>{
-      if(timer){
+    return (arg: string) => {
+      if (timer) {
         clearTimeout(timer);
       }
-      timer = setTimeout(async ()=>{
-        searchStatus.value=true;
-        await cb(...args);
-        searchStatus.value=false;
-      },time);
+      timer = setTimeout(async () => {
+        searchStatus.value = true;
+        await cb(arg);
+        searchStatus.value = false;
+      }, time);
     };
   };
-  const onInputCb = async(value: string)=>{
+  const onInputCb = async (value: string) => {
     await handleSearch(value);
     visible.value = true;
   };
-  const onInputDebounce = debounce(onInputCb,delay.value);
-  const onInput =(e: Event) => {
+  const onInputDebounce = debounce(onInputCb, delay.value);
+  const onInput = (e: Event) => {
     const inp = e.target as HTMLInputElement;
-    searchStatus.value=false;
-    showNoResultItemTemplate.value=false;
+    searchStatus.value = false;
+    showNoResultItemTemplate.value = false;
     ctx.emit('update:modelValue', inp.value);
     onInputDebounce(inp.value);
   };
-  const onFocus =() => {
+  const onFocus = () => {
+    isFocus.value = true;
     handleSearch(modelValue.value);
-    recentlyFocus(latestSource.value);
+    recentlyFocus(latestSource?.value);
     transInputFocusEmit.value && transInputFocusEmit.value();
   };
-  const handleClose = ()=>{
-    visible.value=false;
-    searchStatus.value=false;
-    showNoResultItemTemplate.value=false;
+  const onBlur = () => {
+    isFocus.value = false;
+    ctx.emit('blur');
   };
-  const toggleMenu =()=>{
-    if(!disabled.value){
-      if(visible.value){
+  const onClear = () => {
+    ctx.emit('update:modelValue', '');
+    ctx.emit('clear');
+  };
+  const handleClose = () => {
+    visible.value = false;
+    searchStatus.value = false;
+    showNoResultItemTemplate.value = false;
+  };
+  const toggleMenu = () => {
+    if (!isDisabled.value) {
+      if (visible.value) {
         handleClose();
-      }else{
-        visible.value=true;
-        if (ctx.slots.noResultItemTemplate&&searchList.value.length===0&&modelValue.value.trim()!=='') {
-          showNoResultItemTemplate.value=true;
+      } else {
+        visible.value = true;
+        if (ctx.slots.noResultItemTemplate && searchList.value.length === 0 && modelValue.value.trim() !== '') {
+          showNoResultItemTemplate.value = true;
         }
       }
     }
@@ -67,8 +84,11 @@ export default function useInputHandle(
     toggleMenu,
     onInput,
     onFocus,
+    onBlur,
+    onClear,
+    isFocus,
     inputRef,
     visible,
-    searchStatus
+    searchStatus,
   };
 }

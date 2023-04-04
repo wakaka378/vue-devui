@@ -1,19 +1,20 @@
-import { PropType, ExtractPropTypes, ComponentInternalInstance, InjectionKey } from 'vue';
-import { TableStore } from './store';
+import type { PropType, ExtractPropTypes, ComponentInternalInstance, InjectionKey, Ref, ComputedRef, CSSProperties, ToRefs } from 'vue';
+import { TableStore } from './store/store-types';
 
 export type TableSize = 'sm' | 'md' | 'lg';
 export type BorderType = '' | 'bordered' | 'borderless';
+export type RowKeyType = string | ((v: Record<string, unknown>, index?: number | undefined) => string);
 
 export type SpanMethod = (data: {
-  row: any;
-  column: any;
+  row: unknown;
+  column: unknown;
   rowIndex: number;
   columnIndex: number;
 }) => number[] | { rowspan: number; colspan: number };
 
-export const TableProps = {
+export const tableProps = {
   data: {
-    type: Array as PropType<Record<string, any>[]>,
+    type: Array as PropType<Record<string, unknown>[]>,
     default: [],
   },
   striped: {
@@ -57,8 +58,8 @@ export const TableProps = {
   },
   tableLayout: {
     type: String as PropType<'fixed' | 'auto'>,
-    default: 'auto',
-    validator(v: string) {
+    default: 'fixed',
+    validator(v: string): boolean {
       return v === 'fixed' || v === 'auto';
     },
   },
@@ -77,13 +78,46 @@ export const TableProps = {
     type: String as PropType<BorderType>,
     default: '',
   },
+  empty: {
+    type: String,
+    default: 'No Data',
+  },
+  showHeader: {
+    type: Boolean,
+    default: true,
+  },
+  rowKey: {
+    type: [Function as PropType<(v: Record<string, unknown>, index?: number | undefined) => string>, String],
+    default: 'id',
+  },
+  defaultExpandAll: {
+    type: Boolean,
+    default: false,
+  },
+  expandRowKeys: {
+    type: Array as PropType<string[]>,
+  },
+  indent: {
+    type: Number,
+    default: 16,
+  },
+  lazy: {
+    type: Boolean,
+    default: false,
+  },
 };
 
-export type TablePropsTypes = ExtractPropTypes<typeof TableProps>;
+export type TableProps = ExtractPropTypes<typeof tableProps>;
 
-export interface Table<T = Record<string, any>> extends ComponentInternalInstance {
+export type DefaultRow = TableProps['data'][number];
+
+export interface ITable<T = DefaultRow> extends ComponentInternalInstance {
   store: TableStore<T>;
-  props: TablePropsTypes;
+  props: TableProps;
+  tableId: string;
+  hiddenColumns: Ref<HTMLElement | null>;
+  tableRef: Ref<HTMLElement>;
+  updateColumnWidth: () => void;
 }
 
 // export interface TableCheckStatusArg {
@@ -96,7 +130,7 @@ export interface Table<T = Record<string, any>> extends ComponentInternalInstanc
 //   open: boolean; // 子表格是否展开
 // }
 
-export interface TableMethods<T = Record<string, any>> {
+export interface TableMethods<T = Record<string, unknown>> {
   getCheckedRows(): T[];
   // setRowCheckStatus(arg: TableCheckStatusArg): void
   // setTableCheckStatus(arg: RowToggleStatusEventArg): void
@@ -105,6 +139,19 @@ export interface TableMethods<T = Record<string, any>> {
   // cancelEditingStatus(): void
 }
 
-export const TABLE_TOKEN: InjectionKey<Table> = Symbol();
+export const TABLE_TOKEN: InjectionKey<ITable> = Symbol();
 
-export type SortDirection = 'ASC' | 'DESC' | '';
+export interface UseTable {
+  classes: ComputedRef<Record<string, boolean>>;
+  styles: ComputedRef<CSSProperties>;
+}
+
+export type UseFixedColumn = ToRefs<{ stickyClass: ComputedRef<Record<string, boolean>>; stickyStyle: ComputedRef<CSSProperties> }>;
+
+export interface UseTableLayout {
+  tableWidth: Ref;
+  updateColumnWidth: () => void;
+}
+
+
+export type ITableInstanceAndDefaultRow = ComponentInternalInstance & ITable<DefaultRow>;

@@ -1,43 +1,60 @@
-import { watch, reactive, onBeforeMount, ToRefs, Slots, h } from 'vue';
-import { Column, TableColumnPropsTypes } from './column-types';
-import { formatWidth, formatMinWidth } from '../../utils';
+import { watch, reactive, onBeforeMount, computed, getCurrentInstance, Ref, VNode, SetupContext } from 'vue';
+import type { ToRefs, ComputedRef } from 'vue';
+import { ITable, DefaultRow, TableProps } from '../../table-types';
+import type { Column, TableColumnProps, TableColumn, SortDirection, SortMethod } from './column-types';
+import type { TableStore } from '../../store/store-types';
+import { formatWidth } from '../../utils';
+import { cellMap } from './config';
 
-function defaultRenderHeader(this: Column) {
-  return h('span', { class: 'title' }, this.header);
-}
-
-export function createColumn<T extends Record<string, unknown> = any>(props: ToRefs<TableColumnPropsTypes>, templates: Slots): Column<T> {
+export function createColumn(id: string, props: ToRefs<TableColumnProps>, ctx: SetupContext): Column {
   const {
+    type,
     field,
     header,
     sortable,
+    sortDirection,
     width,
     minWidth,
+    maxWidth,
     formatter,
-    compareFn,
+    sortMethod,
     filterable,
     filterList,
     filterMultiple,
     order,
     fixedLeft,
     fixedRight,
+    align,
+    showOverflowTooltip,
+    resizeable,
+    cellClass,
   } = props;
-  const column: Column = reactive({});
+  const column: Partial<Column> = reactive({ id });
+  column.type = type.value;
 
-  function defaultRenderCell<K extends Record<string, unknown>>(rowData: K, index: number) {
-    const value = rowData[this.field];
-    if (templates.default) {
-      return templates.default(rowData);
+  function renderHeader(columnItem: Column, store: TableStore) {
+    if (ctx.slots.header) {
+      return ctx.slots.header(columnItem);
     }
-    if (this.formatter) {
-      return this.formatter(rowData, value, index);
-    }
+    return cellMap[type.value || 'default'].renderHeader(columnItem, store);
+  }
 
-    return value?.toString?.() ?? '';
+  function renderCell(
+    rowData: DefaultRow,
+    columnItem: Column,
+    store: TableStore,
+    rowIndex: number,
+    tableProps: TableProps,
+    cellMode: string
+  ) {
+    if (ctx.slots.default && columnItem.type === 'index') {
+      return ctx.slots.default({ row: rowData, rowIndex });
+    }
+    return cellMap[type.value || 'default'].renderCell(rowData, columnItem, store, rowIndex, tableProps, cellMode, ctx);
   }
 
   watch(
-    [field, header, order],
+    [field, header, order] as [Ref<string>, Ref<string>, Ref<number>],
     ([fieldVal, headerVal, orderVal]) => {
       column.field = fieldVal;
       column.header = headerVal;
@@ -47,10 +64,15 @@ export function createColumn<T extends Record<string, unknown> = any>(props: ToR
   );
 
   // 排序功能
-  watch([sortable, compareFn], ([sortableVal, compareFnVal]) => {
-    column.sortable = sortableVal;
-    column.compareFn = compareFnVal;
-  });
+  watch(
+    [sortable, sortDirection, sortMethod] as [Ref<boolean>, Ref<SortDirection>, Ref<SortMethod>],
+    ([sortableVal, sortDirectionVal, sortMethodVal]) => {
+      column.sortable = sortableVal;
+      column.sortDirection = sortDirectionVal;
+      column.sortMethod = sortMethodVal;
+    },
+    { immediate: true }
+  );
 
   // 过滤功能
   watch(
@@ -65,7 +87,7 @@ export function createColumn<T extends Record<string, unknown> = any>(props: ToR
 
   // 固定左右功能
   watch(
-    [fixedLeft, fixedRight],
+    [fixedLeft, fixedRight] as Ref<string>[],
     ([left, right]) => {
       column.fixedLeft = left;
       column.fixedRight = right;
@@ -73,21 +95,80 @@ export function createColumn<T extends Record<string, unknown> = any>(props: ToR
     { immediate: true }
   );
 
+  watch(
+    align,
+    (alignVal) => {
+      column.align = alignVal;
+    },
+    { immediate: true }
+  );
+
+  watch(
+    cellClass,
+    (cellClassVal) => {
+      column.cellClass = cellClassVal;
+    },
+    { immediate: true }
+  );
+
+  watch(
+    showOverflowTooltip,
+    (showVal) => {
+      column.showOverflowTooltip = showVal;
+    },
+    { immediate: true }
+  );
+
+  watch(
+    resizeable,
+    (resizeVal) => {
+      column.resizeable = resizeVal;
+    },
+    { immediate: true }
+  );
+
   // 宽度
-  watch([width, minWidth], ([widthVal, minWidthVal]) => {
-    column.width = formatWidth(widthVal);
-    column.minWidth = formatMinWidth(minWidthVal);
-    column.realWidth = column.width || column.minWidth;
-  });
+  watch(
+    [width, minWidth, maxWidth],
+    ([widthVal, minWidthVal, maxWidthVal]) => {
+      column.width = formatWidth(widthVal);
+      column.minWidth = minWidthVal;
+      column.maxWidth = maxWidthVal;
+      column.realWidth = column.width;
+    },
+    { immediate: true }
+  );
 
   // 基础渲染功能
   onBeforeMount(() => {
-    column.renderHeader = defaultRenderHeader;
-    column.renderCell = defaultRenderCell;
-    column.formatter = formatter.value;
-    column.customFilterTemplate = templates.customFilterTemplate;
-    column.subColumns = templates.subColumns;
+    column.id = id;
+    column.renderHeader = renderHeader as () => VNode;
+    column.renderCell = renderCell as () => VNode;
+    column.formatter = formatter?.value;
+    column.customFilterTemplate = ctx.slots.customFilterTemplate;
+    column.subColumns = ctx.slots.subColumns;
+    column.slots = ctx.slots;
+    column.ctx = ctx;
   });
 
-  return column;
+  return column as Column;
+}
+
+export function useRender<T>(): {
+  columnOrTableParent: ComputedRef<ITable<T> | TableColumn>;
+  getColumnIndex: (children: Array<unknown>, child: unknown) => number;
+} {
+  const instance = getCurrentInstance() as TableColumn;
+  const columnOrTableParent = computed(() => {
+    let parent = instance?.parent as TableColumn;
+    while (parent && !parent.tableId && !parent.columnId) {
+      parent = parent.parent;
+    }
+    return parent;
+  });
+  const getColumnIndex = (children: Array<unknown>, child: unknown) => {
+    return Array.prototype.indexOf.call(children, child);
+  };
+
+  return { columnOrTableParent, getColumnIndex };
 }

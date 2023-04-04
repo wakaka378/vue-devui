@@ -1,16 +1,16 @@
-import type { PropType, ExtractPropTypes } from 'vue';
+import type { PropType, ExtractPropTypes, UnwrapRef } from 'vue';
 import { FileUploader } from './file-uploader';
 
 export class IUploadOptions {
   // 上传接口地址
-  uri: string;
+  uri!: string | URL;
   // http 请求方法
   method?: string;
   // 上传文件大小限制
   maximumSize?: number;
   // 自定义请求headers
   headers?: {
-    [key: string]: any;
+    [key: string]: string;
   };
   // 认证token
   authToken?: string;
@@ -18,7 +18,7 @@ export class IUploadOptions {
   authTokenHeader?: string;
   // 上传额外自定义参数
   additionalParameter?: {
-    [key: string]: any;
+    [key: string]: string | Blob;
   };
   // 上传文件字段名称，默认file
   fileFieldName?: string;
@@ -33,7 +33,7 @@ export class IUploadOptions {
 export class IFileOptions {
   accept?: string;
   multiple?: boolean;
-  webkitdirectory: boolean;
+  webkitdirectory?: boolean;
 }
 
 export enum UploadStatus {
@@ -43,9 +43,14 @@ export enum UploadStatus {
   failed,
 }
 
-type DynamicUploadOptionsFn = (files, uploadOptions) => IUploadOptions;
-type ChangeFn = (_: any) => void;
-type BeforeUploadFn = (file: FileUploader) => boolean | Promise<boolean>;
+export interface IFileResponse<T = unknown> {
+  file: File;
+  response: T;
+}
+
+type DynamicUploadOptionsFn = (files: unknown, uploadOptions: unknown) => IUploadOptions;
+type ChangeFn = (files: File[], uploadFiles: File[]) => void;
+type BeforeUploadFn = (file: UnwrapRef<FileUploader[]>) => boolean | Promise<boolean>;
 
 export const uploadProps = {
   // 规定能够通过文件上传进行提交的文件类型,例如 accept: '.xls,.xlsx,.pages,.mp3,.png'
@@ -70,7 +75,7 @@ export const uploadProps = {
   },
   placeholder: {
     type: String,
-    default: '选择文件',
+    default: '',
   },
   modelValue: {
     type: Array as PropType<File[]>,
@@ -95,7 +100,7 @@ export const uploadProps = {
     type: Function as PropType<ChangeFn>,
   },
   fileDrop: {
-    type: Function as PropType<(v: any) => void>,
+    type: Function as PropType<(v: unknown) => void>,
     default: undefined,
   },
   fileOver: {
@@ -110,17 +115,37 @@ export const uploadProps = {
     type: Function as PropType<(v: string) => void>,
     default: undefined,
   },
-  'on-error': {
-    type: Function as PropType<(v: { file: File; response: any }) => void>,
+  onError: {
+    type: Function as PropType<(v: { file: File; response: unknown }) => void>,
     default: undefined,
   },
-  'on-success': {
-    type: Function as PropType<(v: { file: File; response: any }[]) => void>,
+  onSuccess: {
+    type: Function as PropType<(v: { file: File; response: unknown }[]) => void>,
+    default: undefined,
+  },
+  onExceed: {
+    type: Function as PropType<(files: File[], uploadFiles: File[]) => void>,
+    default: undefined,
+  },
+  onProgress: {
+    type: Function as PropType<(files: File[], uploadFiles: File[]) => void>,
+    default: undefined,
+  },
+  onPreview: {
+    type: Function as PropType<(file: File) => void>,
     default: undefined,
   },
   oneTimeUpload: {
     type: Boolean,
     default: false,
+  },
+  limit: {
+    type: Number,
+    default: 0,
+  },
+  httpRequest: {
+    type: Function as PropType<(files: File[]) => void>,
+    default: undefined,
   },
 } as const;
 

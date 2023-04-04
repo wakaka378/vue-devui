@@ -1,9 +1,9 @@
-import { onMounted, ref, toRefs, computed } from 'vue';
+import { onMounted, ref, toRefs, computed, watch } from 'vue';
 import type { Ref } from 'vue';
 import { debounce } from 'lodash';
 import { TooltipProps, BasePlacement, UseTooltipFn } from './tooltip-types';
 
-const TransformOriginMap: Record<string, string> = {
+export const transformOriginMap: Record<BasePlacement, string> = {
   top: '50% calc(100% + 8px)',
   bottom: '50% -8px',
   left: 'calc(100% + 8px)',
@@ -11,13 +11,13 @@ const TransformOriginMap: Record<string, string> = {
 };
 
 export function useTooltip(origin: Ref, props: TooltipProps): UseTooltipFn {
-  const { position, mouseEnterDelay, mouseLeaveDelay } = toRefs(props);
+  const { position, mouseEnterDelay, mouseLeaveDelay, enterable, disabled, hideAfter } = toRefs(props);
   const visible = ref<boolean>(false);
   const isEnter = ref<boolean>(false);
   const positionArr = computed(() => (typeof position.value === 'string' ? [position.value] : position.value));
   const placement = ref<BasePlacement>(positionArr.value[0]);
   const overlayStyles = computed(() => ({
-    transformOrigin: TransformOriginMap[placement.value],
+    transformOrigin: transformOriginMap[placement.value],
   }));
   const enter = debounce(() => {
     isEnter.value && (visible.value = true);
@@ -27,9 +27,13 @@ export function useTooltip(origin: Ref, props: TooltipProps): UseTooltipFn {
   }, mouseLeaveDelay.value);
 
   const onMouseenter = () => {
+    if (disabled.value) {
+      return;
+    }
     isEnter.value = true;
     enter();
   };
+
   const onMouseleave = () => {
     isEnter.value = false;
     leave();
@@ -38,10 +42,40 @@ export function useTooltip(origin: Ref, props: TooltipProps): UseTooltipFn {
     placement.value = pos;
   };
 
+  const quickLeave = () => {
+    isEnter.value = false;
+    visible.value = false;
+  };
+
+  const onMouseenterOverlay = () => {
+    if (!enterable.value) {
+      quickLeave();
+    } else {
+      onMouseenter();
+    }
+  };
+
   onMounted(() => {
     origin.value.addEventListener('mouseenter', onMouseenter);
     origin.value.addEventListener('mouseleave', onMouseleave);
   });
 
-  return { visible, placement, positionArr, overlayStyles, onPositionChange };
+  let timer: NodeJS.Timeout | null;
+  watch(visible, (newVal) => {
+    if (newVal && hideAfter.value) {
+      timer && clearTimeout(timer);
+      timer = setTimeout(quickLeave, hideAfter.value);
+    }
+  });
+
+  return {
+    visible,
+    placement,
+    positionArr,
+    overlayStyles,
+    onPositionChange,
+    onMouseenter,
+    onMouseleave,
+    onMouseenterOverlay,
+  };
 }

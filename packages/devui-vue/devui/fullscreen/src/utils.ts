@@ -1,18 +1,24 @@
 import { FullscreenProps } from './fullscreen-types';
+import { useNamespace } from '../../shared/hooks/use-namespace';
 
 interface CompatibleHTMLElement extends HTMLElement {
   mozRequestFullScreen?: () => void;
   webkitRequestFullScreen?: () => void;
   msRequestFullscreen?: () => void;
-  exitFullscreen?: () => void;
-  mozCancelFullScreen?: () => void;
-  webkitCancelFullScreen?: () => void;
-  msExitFullscreen?: () => void;
 }
+
+interface CompatibleDocument extends Document {
+  exitFullscreen: () => Promise<void>;
+  mozCancelFullScreen?: () => Promise<void>;
+  webkitCancelFullScreen?: () => Promise<void>;
+  msExitFullscreen?: () => Promise<void>;
+}
+
+const ns = useNamespace('fullscreen');
 
 // 页面全屏
 export const launchNormalFullscreen = (targetElement: HTMLElement, props: FullscreenProps): void => {
-  targetElement.classList.add('devui-fullscreen');
+  targetElement.classList.add(ns.b());
   if (props.zIndex) {
     targetElement.setAttribute('style', `z-index: ${props.zIndex}`);
   }
@@ -20,7 +26,7 @@ export const launchNormalFullscreen = (targetElement: HTMLElement, props: Fullsc
 
 // 退出正常全屏
 export const exitNormalFullscreen = (targetElement: HTMLElement): void => {
-  targetElement.classList.remove('devui-fullscreen');
+  targetElement.classList.remove(ns.b());
   targetElement.style.zIndex = '';
 };
 
@@ -38,7 +44,7 @@ export const launchImmersiveFullScreen = async (docElement: CompatibleHTMLElemen
   return await fullscreenLaunch?.then(() => !!document.fullscreenElement);
 };
 
-export const exitImmersiveFullScreen = async (doc: CompatibleHTMLElement): Promise<boolean | undefined> => {
+export const exitImmersiveFullScreen = async (doc: CompatibleDocument): Promise<boolean | undefined> => {
   let fullscreenExit = null;
   if (doc.exitFullscreen) {
     fullscreenExit = doc.exitFullscreen();
@@ -53,9 +59,9 @@ export const exitImmersiveFullScreen = async (doc: CompatibleHTMLElement): Promi
 };
 
 export const addFullScreenStyle = (): void => {
-  document.getElementsByTagName('html')[0].classList.add('devui-fullscreen-html');
+  document.getElementsByTagName('html')[0].classList.add(ns.e('html'));
 };
 
 export const removeFullScreenStyle = (): void => {
-  document.getElementsByTagName('html')[0].classList.remove('devui-fullscreen-html');
+  document.getElementsByTagName('html')[0].classList.remove(ns.e('html'));
 };

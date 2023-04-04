@@ -1,209 +1,170 @@
-import { defineComponent, ref, Transition, computed } from 'vue';
-import { selectProps, SelectProps, OptionObjectItem } from './use-select';
-import { Icon } from '../../icon';
+import {
+  defineComponent,
+  provide,
+  reactive,
+  ref,
+  Transition,
+  toRefs,
+  getCurrentInstance,
+  onMounted,
+  Teleport,
+  watch,
+  withModifiers,
+  onUnmounted,
+} from 'vue';
+import type { SetupContext } from 'vue';
+import useSelect from './use-select';
+import { selectProps, SelectProps, SelectContext } from './select-types';
+import { SELECT_TOKEN } from './const';
 import { Checkbox } from '../../checkbox';
-import { className } from './utils';
-import useCacheOptions from '../hooks/use-cache-options';
-import useSelectOutsideClick from '../hooks/use-select-outside-click';
+import Option from './components/option';
+import { useNamespace } from '../../shared/hooks/use-namespace';
+import SelectContent from './components/select-content';
+import useSelectFunction from './composables/use-select-function';
 import './select.scss';
+import { createI18nTranslate } from '../../locale/create';
+import { FlexibleOverlay, Placement } from '../../overlay';
 
 export default defineComponent({
   name: 'DSelect',
   props: selectProps,
-  emits: ['toggleChange', 'valueChange', 'update:modelValue'],
-  setup(props: SelectProps, ctx) {
-    const containerRef = ref(null);
-    const dropdownRef = ref(null);
-    // 控制弹窗开合
-    const isOpen = ref<boolean>(false);
-    function toggleChange(bool: boolean) {
-      if (props.disabled) {return;}
-      isOpen.value = bool;
-      ctx.emit('toggleChange', bool);
-    }
-    useSelectOutsideClick([containerRef, dropdownRef], isOpen, toggleChange);
+  emits: ['toggle-change', 'value-change', 'update:modelValue', 'focus', 'blur', 'remove-tag', 'clear'],
+  setup(props: SelectProps, ctx: SetupContext) {
+    const app = getCurrentInstance();
+    const t = createI18nTranslate('DSelect', app);
 
-    // 这里对options做统一处理
-    const mergeOptions = computed(() => {
-      const { multiple, modelValue } = props;
-      return props.options.map((item) => {
-        let option: OptionObjectItem;
-        if (typeof item === 'object') {
-          option = {
-            name: item.name ? item.name : item.value + '',
-            _checked: false,
-            ...item,
-          };
-        } else {
-          option = {
-            name: item + '',
-            value: item,
-            _checked: false,
-          };
-        }
-        if (multiple) {
-          /**
-           * TODO: 这里mergeOptions依赖了modelValue
-           * 但是下面点击item更新的时候modelValue又是根据mergeOptions来算出来的
-           * 因此可能会多更新一次，后续优化
-           */
-          if (Array.isArray(modelValue)) {
-            option._checked = modelValue.includes(option.value);
-          } else {
-            option._checked = false;
-          }
-        }
-
-        return option;
-      });
-    });
-    // 缓存options，用value来获取对应的optionItem
-    const getValuesOption = useCacheOptions(mergeOptions);
-    // 控制输入框的显示内容
-    const inputValue = computed<string>(() => {
-      if (props.multiple && Array.isArray(props.modelValue)) {
-        const selectedOptions = getValuesOption(props.modelValue);
-        return selectedOptions.map((item) => item?.name || '').join(',');
-      } else if (!Array.isArray(props.modelValue)) {
-        return getValuesOption([props.modelValue])[0]?.name || '';
-      }
-      return '';
-    });
-    // 是否可清空
-    const mergeClearable = computed<boolean>(() => {
-      return !props.disabled && props.allowClear && inputValue.value.length > 0;
-    });
-
-    function valueChange(item: OptionObjectItem, index: number) {
-      const { multiple, optionDisabledKey: disabledKey } = props;
-      let { modelValue } = props;
-      if (disabledKey && !!item[disabledKey]) {return;}
-      if (multiple) {
-        item._checked = !item._checked;
-        modelValue = mergeOptions.value
-          .filter((item1) => item1._checked)
-          .map((item2) => item2.value);
-        ctx.emit('update:modelValue', modelValue);
-      } else {
-        ctx.emit('update:modelValue', item.value);
-        toggleChange(false);
-      }
-      ctx.emit('valueChange', item, index);
-    }
-
-    function getItemClassName(item: OptionObjectItem) {
-      const { optionDisabledKey: disabledKey } = props;
-      return className('devui-select-item', {
-        active: item.value === props.modelValue,
-        disabled: disabledKey ? !!item[disabledKey] : false,
-      });
-    }
-
-    function handleClear(e: MouseEvent) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (props.multiple) {
-        ctx.emit('update:modelValue', []);
-      } else {
-        ctx.emit('update:modelValue', '');
-      }
-    }
-
-    return {
-      isOpen,
-      containerRef,
-      dropdownRef,
-      inputValue,
-      mergeOptions,
-      mergeClearable,
-      valueChange,
-      toggleChange,
-      getItemClassName,
-      handleClear,
-    };
-  },
-  render() {
+    const selectRef = ref();
+    const { isSelectFocus, focus, blur } = useSelectFunction(props, selectRef);
     const {
-      mergeOptions,
+      selectDisabled,
+      selectSize,
+      originRef,
+      dropdownRef,
       isOpen,
-      inputValue,
-      size,
-      multiple,
-      disabled,
-      optionDisabledKey: disabledKey,
-      placeholder,
-      overview,
+      selectCls,
+      mergeOptions,
+      selectedOptions,
+      filterQuery,
+      emptyText,
+      isLoading,
+      isShowEmptyText,
       valueChange,
-      toggleChange,
-      getItemClassName,
-      mergeClearable,
       handleClear,
-    } = this;
+      updateInjectOptions,
+      tagDelete,
+      onFocus,
+      onBlur,
+      debounceQueryFilter,
+      isDisabled,
+      toggleChange,
+      isShowCreateOption,
+    } = useSelect(props, selectRef, ctx, focus, blur, isSelectFocus, t);
 
-    const selectCls = className('devui-select', {
-      'devui-select-open': isOpen,
-      'devui-dropdown-menu-multiple': multiple,
-      'devui-select-lg': size === 'lg',
-      'devui-select-sm': size === 'sm',
-      'devui-select-underlined': overview === 'underlined',
-      'devui-select-disabled': disabled,
+    const scrollbarNs = useNamespace('scrollbar');
+    const ns = useNamespace('select');
+    const dropdownCls = ns.e('dropdown');
+    const listCls = {
+      [ns.e('dropdown-list')]: true,
+      [scrollbarNs.b()]: true,
+    };
+    const dropdownEmptyCls = ns.em('dropdown', 'empty');
+    ctx.expose({ focus, blur, toggleChange });
+    const isRender = ref<boolean>(false);
+    const position = ref<Placement[]>(['bottom-start', 'top-start']);
+    const dropdownWidth = ref('0');
+
+    const updateDropdownWidth = () => {
+      dropdownWidth.value = originRef?.value?.clientWidth ? originRef.value.clientWidth + 'px' : '100%';
+    };
+
+    watch(selectRef, (val) => {
+      if (val) {
+        originRef.value = val.$el;
+        updateDropdownWidth();
+      }
     });
 
-    const inputCls = className('devui-select-input', {
-      'devui-select-input-lg': size === 'lg',
-      'devui-select-input-sm': size === 'sm',
+    onMounted(() => {
+      isRender.value = true;
+      updateDropdownWidth();
+      window.addEventListener('resize', updateDropdownWidth);
     });
 
-    const selectionCls = className('devui-select-selection', {
-      'devui-select-clearable': mergeClearable,
+    onUnmounted(() => {
+      window.removeEventListener('resize', updateDropdownWidth);
     });
 
-    return (
-      <div class={selectCls} ref="containerRef">
-        <div class={selectionCls} onClick={() => toggleChange(!isOpen)}>
-          <input
-            value={inputValue}
-            type="text"
-            class={inputCls}
-            placeholder={placeholder}
-            readonly
-            disabled={disabled}
-          />
-          <span onClick={handleClear} class="devui-select-clear">
-            <Icon name="close" />
-          </span>
-          <span class="devui-select-arrow">
-            <Icon name="select-arrow" />
-          </span>
-        </div>
-        <Transition name="fade" ref="dropdownRef">
-          <div v-show={isOpen} class="devui-select-dropdown">
-            <ul class="devui-select-dropdown-list devui-scrollbar">
-              {mergeOptions.map((item, i) => (
-                <li
-                  onClick={(e: MouseEvent) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    valueChange(item, i);
-                  }}
-                  class={getItemClassName(item)}
-                  key={i}
-                >
-                  {multiple ? (
-                    <Checkbox
-                      modelValue={item._checked}
-                      label={item.name}
-                      disabled={disabledKey ? !!item[disabledKey] : false}
-                    />
-                  ) : (
-                    item.name
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Transition>
-      </div>
+    provide(
+      SELECT_TOKEN,
+      reactive({
+        ...toRefs(props),
+        selectDisabled,
+        selectSize,
+        isOpen,
+        selectedOptions,
+        filterQuery,
+        valueChange,
+        handleClear,
+        updateInjectOptions,
+        tagDelete,
+        onFocus,
+        onBlur,
+        debounceQueryFilter,
+      }) as SelectContext
     );
+    return () => {
+      return (
+        <div
+          class={selectCls.value}
+          onClick={withModifiers(() => {
+            toggleChange(!isOpen.value);
+          }, ['stop'])}>
+          <SelectContent ref={selectRef}></SelectContent>
+          <Teleport to="body">
+            <Transition name="fade">
+              <FlexibleOverlay
+                v-model={isRender.value}
+                ref={dropdownRef}
+                origin={originRef.value}
+                align="start"
+                offset={4}
+                position={position.value}
+                style={{
+                  visibility: isOpen.value ? 'visible' : 'hidden',
+                  'z-index': isOpen.value ? 'var(--devui-z-index-dropdown, 1052)' : -1,
+                }}>
+                <div class={dropdownCls} style={{ width: `${dropdownWidth.value}`, visibility: isOpen.value ? 'visible' : 'hidden' }}>
+                  <ul class={listCls} v-show={!isLoading.value}>
+                    {isShowCreateOption.value && (
+                      <Option value={filterQuery.value} name={filterQuery.value} create>
+                        {props.multiple ? <Checkbox modelValue={false} label={filterQuery.value} /> : filterQuery.value}
+                      </Option>
+                    )}
+                    {ctx.slots?.default && ctx.slots.default()}
+                    {!ctx.slots?.default &&
+                      mergeOptions.value.length >= 1 &&
+                      mergeOptions.value.map((item) => (
+                        <Option key={item.value} value={item.value} name={item.name} disabled={isDisabled(item)}>
+                          {props.multiple ? (
+                            <Checkbox modelValue={item._checked} label={item.name} disabled={isDisabled(item)} />
+                          ) : (
+                            item.name || item.value
+                          )}
+                        </Option>
+                      ))}
+                  </ul>
+                  {isShowEmptyText.value && (
+                    <div>
+                      {ctx.slots?.empty && ctx.slots.empty()}
+                      {!ctx.slots?.empty && <p class={dropdownEmptyCls}>{emptyText.value}</p>}
+                    </div>
+                  )}
+                </div>
+              </FlexibleOverlay>
+            </Transition>
+          </Teleport>
+        </div>
+      );
+    };
   },
 });
